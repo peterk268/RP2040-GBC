@@ -1,10 +1,28 @@
-# RP2040_GB
+# RP2040-GB for Pico-GB
 
-Game Boy (DMG) emulator [Peanut-GB](https://github.com/deltabeard/Peanut-GB) on the Raspberry Pi RP2040 microcontroller, using an ILI9225 screen.
+This is a fork of the [RP2040-GB Game Boy (DMG) emulator from deltabeard](https://github.com/deltabeard/RP2040-GB). 
 
+This fork includes all changes needed for the emulator to run on the [Pico-GB emulation console](https://www.youmaketech.com/pico-gb-raspberry-pi-pico-gameboy-emulation-console/). The Pico-GB is a 3d-printed retro-gaming emulation console that ressembles to the original Nintendo Game Boy released in 1989. 
+
+RP2040-GB is a Game Boy (DMG) emulator [Peanut-GB](https://github.com/deltabeard/Peanut-GB) on the Raspberry Pi RP2040 microcontroller, using an ILI9225 screen.
 Runs at more than 70 fps without audio emulation. With frame skip and interlacing, can run at up to 120 fps.
 
-![Photo of a Raspberry Pi Pico playing Pokemon Red](https://user-images.githubusercontent.com/3747104/162945331-605747fb-e48e-4b29-8007-9947afa29597.jpg)
+# Raspberry Pi Pico Pins Assignment
+UP = GP2
+DOWN = GP3
+LEFT = GP4
+RIGHT = GP5
+BUTTON A = GP6
+BUTTON B = GP7
+SELECT = GP8
+START = GP9
+BUZZER = GP15
+LCD CS = GP17
+LCD CLK = GP18
+LCD SDI = GP19
+LCD RS = GP20
+LCD RST = GP21
+LCD LED = GP22
 
 # Building
 
