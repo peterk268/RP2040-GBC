@@ -8,21 +8,29 @@ RP2040-GB is a Game Boy (DMG) emulator [Peanut-GB](https://github.com/deltabeard
 Runs at more than 70 fps without audio emulation. With frame skip and interlacing, can run at up to 120 fps.
 
 # Raspberry Pi Pico Pins Assignment
-UP = GP2
-DOWN = GP3
-LEFT = GP4
-RIGHT = GP5
-BUTTON A = GP6
-BUTTON B = GP7
-SELECT = GP8
-START = GP9
-BUZZER = GP15
-LCD CS = GP17
-LCD CLK = GP18
-LCD SDI = GP19
-LCD RS = GP20
-LCD RST = GP21
-LCD LED = GP22
+* UP = GP2
+* DOWN = GP3
+* LEFT = GP4
+* RIGHT = GP5
+* BUTTON A = GP6
+* BUTTON B = GP7
+* SELECT = GP8
+* START = GP9
+* BUZZER = GP15
+* LCD CS = GP17
+* LCD CLK = GP18
+* LCD SDI = GP19
+* LCD RS = GP20
+* LCD RST = GP21
+* LCD LED = GP22
+
+# Installing
+
+Start by plugging a micro USB cable into the micro USB port on your Pico. Hold down the BOOTSEL button on the top of your Pico; while still holding it down, connect the other end of the micro USB cable to one of the USB ports on your Raspberry Pi or other computer.
+
+After a few seconds, you should see your Pico appear as a removable drive. Copy the RP2040_GB.uf2 file from the build directory to your Pico. You can find an example .uf2 file in the releases with the open source game ["Libbet and the Magic Floor" from Damian Yerrick](https://github.com/pinobatch/libbet). 
+
+Unplug the USB cable from your Pico now and plug it back. After a few seconds, the game should start.
 
 # Building
 
