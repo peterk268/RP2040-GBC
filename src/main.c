@@ -223,7 +223,7 @@ void core1_lcd_draw_line(const uint_fast8_t line)
 	}
 
 	//mk_ili9225_set_address(line + 16, LCD_WIDTH + 30);
-	mk_ili9225_set_x((SCREEN_SIZE_X - 16) - line);
+	mk_ili9225_set_x(line + 16);
 
 #if USE_DMA
 	mk_ili9225_write_pixels_start();
@@ -279,7 +279,7 @@ void main_core1(void)
 	/* Set LCD window to DMG size. */
 	mk_ili9225_set_window(16, LCD_HEIGHT + 15,
 			      31, LCD_WIDTH + 30);
-	//mk_ili9225_set_address(16, LCD_WIDTH + 30);
+	mk_ili9225_set_address(16, LCD_WIDTH + 30);
 	//mk_ili9225_set_x(15);
 
 #if 0
@@ -358,8 +358,8 @@ int main(void)
 	{
 		/* The value for VCO set here is meant for least power
 		 * consumption. */
-		const unsigned vco = 532000000; /* 266MHz/133MHz */
-		const unsigned div1 = 2, div2 = 1;
+		const unsigned vco = 792000000; /* 264MHz/132MHz */
+		const unsigned div1 = 3, div2 = 1;
 
 		vreg_set_voltage(VREG_VOLTAGE_1_15);
 		sleep_ms(2);

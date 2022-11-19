@@ -333,6 +333,9 @@ unsigned mk_ili9225_init(void)
 	/* Bring ILI9225 out of reset. */
 	mk_ili9225_set_rst(1);
 	mk_ili9225_delay_ms(50);
+	
+	/* Turn backlight off initially */
+	mk_ili9225_set_led(0);
 
 	/* Initialise power registers. */
 	/* FIXME: This may not be required. All are initialised to 0x00,
@@ -455,6 +458,9 @@ unsigned mk_ili9225_init(void)
 	 */
 	set_register(MK_ILI9225_REG_DISPLAY_CTRL, 0x1017);
 	mk_ili9225_delay_ms(50);
+	
+	/* Turn on backlight */
+	mk_ili9225_set_led(1);
 
 #if MK_ILI9225_READ_AVAILABLE
 	/* ret should be 0 if the returned ID was 0x9225. */
