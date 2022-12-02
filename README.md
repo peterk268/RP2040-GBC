@@ -7,6 +7,16 @@ This fork includes all changes needed for the emulator to run on the [Pico-GB em
 RP2040-GB is a Game Boy (DMG) emulator [Peanut-GB](https://github.com/deltabeard/Peanut-GB) on the Raspberry Pi RP2040 microcontroller, using an ILI9225 screen.
 Runs at more than 70 fps without audio emulation. With frame skip and interlacing, can run at up to 120 fps.
 
+# What you need
+* Raspberry Pi Pico (1x)
+* 2.2inch ILI9225 176×220 LCD Display Module (1x)
+* MAX98357A amplifier (1x)
+* 2W 8ohms speaker (1x)
+* Micro Push Button Switch, Momentary Tactile Tact Touch, 6x6x6 mm, 4 pins (8x)
+* Solderable Breadboard (1x)
+* Dupont Wires Assorted Kit (Male to Female + Male to Male + Female to Female)
+* Preformed Breadboard Jumper Wires
+
 # Raspberry Pi Pico Pins Assignment
 * UP = GP2
 * DOWN = GP3
@@ -16,13 +26,15 @@ Runs at more than 70 fps without audio emulation. With frame skip and interlacin
 * BUTTON B = GP7
 * SELECT = GP8
 * START = GP9
-* BUZZER = GP15
 * LCD CS = GP17
 * LCD CLK = GP18
 * LCD SDI = GP19
 * LCD RS = GP20
 * LCD RST = GP21
 * LCD LED = GP22
+* MAX98357A DIN = GP26
+* MAX98357A BCLK = GP27
+* MAX98357A LRC = GP28
 
 # Installing
 

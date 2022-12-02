@@ -13,11 +13,11 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
+// Peanut-GB emulator settings
 #define ENABLE_LCD	1
-
-#ifndef ENABLE_SOUND
-# define ENABLE_SOUND	0
-#endif
+#define ENABLE_SOUND	1
+#define PEANUT_GB_HIGH_LCD_ACCURACY 1
+#define PEANUT_GB_USE_BIOS 0
 
 /* Use DMA for all drawing to LCD. Benefits aren't fully realised at the moment
  * due to busy loops waiting for DMA completion. */
@@ -40,6 +40,7 @@
 #include <string.h>
 
 /* RP2040 Headers */
+#include <hardware/pio.h>
 #include <hardware/clocks.h>
 #include <hardware/dma.h>
 #include <hardware/spi.h>
@@ -55,8 +56,10 @@
 
 /* Project headers */
 #include "hedley.h"
+#include "minigb_apu.h"
 #include "peanut_gb.h"
 #include "mk_ili9225.h"
+#include "i2s.h"
 
 /* GPIO Connections. */
 #define GPIO_UP		2
@@ -74,6 +77,15 @@
 #define GPIO_RS		20
 #define GPIO_RST	21
 #define GPIO_LED	22
+
+#if ENABLE_SOUND
+	// Global variables for audio task
+    // stream contains N=AUDIO_SAMPLES samples
+    // each sample is 32 bits
+    // (16 bits for the left channel + 16 bits for the right channel in stereo interleaved format)
+    // This is intended to be played at AUDIO_SAMPLE_RATE Hz
+	uint16_t *stream;
+#endif
 
 /* DMA channel for LCD communication. */
 static uint dma_lcd;
@@ -206,6 +218,7 @@ void core1_irq_dma_lcd_end_transfer(void)
 	dma_channel_acknowledge_irq0(dma_lcd);
 }
 
+#if ENABLE_LCD 
 void core1_lcd_draw_line(const uint_fast8_t line)
 {
 	const uint16_t palette[3][4] = {
@@ -317,6 +330,7 @@ void main_core1(void)
 
 	HEDLEY_UNREACHABLE();
 }
+#endif
 
 #if ENABLE_LCD
 void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
@@ -422,8 +436,10 @@ int main(void)
 	spi_set_format(spi0, 16, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
 
 	/* Start Core1, which processes requests to the LCD. */
+#if ENABLE_LCD
 	putstdio("CORE1 ");
 	multicore_launch_core1(main_core1);
+#endif
 
 	/* Initialise GB context. */
 	memcpy(rom_bank0, rom, sizeof(rom_bank0));
@@ -469,7 +485,20 @@ int main(void)
 	//gb.direct.interlace = 1;
 #endif
 #if ENABLE_SOUND
+	// Allocate memory for the stream buffer
+    stream=malloc(AUDIO_BUFFER_SIZE_BYTES);
+    assert(stream!=NULL);
+    memset(stream,0,AUDIO_BUFFER_SIZE_BYTES);  // Zero out the stream buffer
+	
+	// Initialize I2S sound driver
+	i2s_config_t i2s_config = i2s_get_default_config();
+	i2s_config.sample_freq=AUDIO_SAMPLE_RATE;
+	i2s_config.dma_trans_count =AUDIO_SAMPLES;
+	i2s_init(&i2s_config);
+	
+	// Initialize audio emulation
 	audio_init();
+	
 	putstdio("AUDIO ");
 #endif
 
@@ -479,9 +508,6 @@ int main(void)
 	while(1)
 	{
 		int input;
-#if ENABLE_SOUND
-		static uint16_t stream[1098];
-#endif
 
 		gb.gb_frame = 0;
 
@@ -492,7 +518,9 @@ int main(void)
 
 		frames++;
 #if ENABLE_SOUND
-		audio_callback(NULL, stream, 1098);
+		audio_callback(NULL, stream, AUDIO_BUFFER_SIZE_BYTES);
+		// i2s_write(&i2s_config,stream,AUDIO_SAMPLES);
+		i2s_dma_write(&i2s_config, stream);
 #endif
 
 		/* Update buttons state */

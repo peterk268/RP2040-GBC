@@ -365,19 +365,17 @@ static void update_noise(int16_t *samples)
 /**
  * SDL2 style audio callback function.
  */
-void audio_callback(void *userdata, uint8_t *stream, int len)
+void audio_callback(void *userdata, int16_t *stream, size_t len)
 {
-	int16_t *samples = (int16_t *)stream;
-
 	/* Appease unused variable warning. */
 	(void)userdata;
 
 	memset(stream, 0, len);
 
-	update_square(samples, 0);
-	update_square(samples, 1);
-	update_wave(samples);
-	update_noise(samples);
+	update_square(stream, 0);
+	update_square(stream, 1);
+	update_wave(stream);
+	update_noise(stream);
 }
 
 static void chan_trigger(uint_fast8_t i)
