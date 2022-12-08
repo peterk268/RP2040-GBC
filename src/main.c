@@ -370,10 +370,8 @@ int main(void)
 
 	/* Overclock. */
 	{
-		/* The value for VCO set here is meant for least power
-		 * consumption. */
-		const unsigned vco = 792000000; /* 264MHz/132MHz */
-		const unsigned div1 = 3, div2 = 1;
+		const unsigned vco = 1596*1000*1000;	/* 266MHz */
+		const unsigned div1 = 6, div2 = 1;
 
 		vreg_set_voltage(VREG_VOLTAGE_1_15);
 		sleep_ms(2);
@@ -432,7 +430,7 @@ int main(void)
 	clock_configure(clk_peri, 0,
 			CLOCKS_CLK_PERI_CTRL_AUXSRC_VALUE_CLK_SYS,
 			125 * 1000 * 1000, 125 * 1000 * 1000);
-	spi_init(spi0, 16*1000*1000);
+	spi_init(spi0, 30*1000*1000);
 	spi_set_format(spi0, 16, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
 
 	/* Start Core1, which processes requests to the LCD. */
