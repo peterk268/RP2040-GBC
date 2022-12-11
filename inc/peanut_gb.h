@@ -104,11 +104,6 @@
 # define PEANUT_GB_USE_INTRINSICS 1
 #endif
 
-/* Function definition for abort(). */
-#ifndef PEANUT_GB_ABORT
-# define PEANUT_GB_ABORT() abort()
-#endif
-
 /** Internal source code. **/
 /* Interrupt masks */
 #define VBLANK_INTR	0x01
@@ -226,11 +221,17 @@
 # define __has_builtin(x) 0
 #endif
 
-#if __has_builtin(__builtin_unreachable)
-# define PGB_UNREACHABLE() __builtin_unreachable()
-#else
-# define PGB_UNREACHABLE() PEANUT_GB_ABORT()
-#endif
+/* The PGB_UNREACHABLE() macro tells the compiler that the code path will never
+ * be reached, allowing for further optimisation. */
+#if !defined(PGB_UNREACHABLE)
+# if __has_builtin(__builtin_unreachable)
+#  define PGB_UNREACHABLE() __builtin_unreachable()
+# elif defined(_MSC_VER)
+#  define PGB_UNREACHABLE() __assume(0)
+# else
+#  define PGB_UNREACHABLE() abort()
+# endif
+#endif /* !defined(PGB_UNREACHABLE) */
 
 #if PEANUT_GB_USE_INTRINSICS
 /* If using MSVC, only enable intrinsics for x86 platforms*/
@@ -342,10 +343,10 @@ struct cpu_registers_s
 	/* Define specific bits of Flag register. */
 	struct
 	{
-		unsigned c : 1; /* Carry flag. */
-		unsigned h : 1; /* Half carry flag. */
-		unsigned n : 1; /* Add/sub flag. */
-		unsigned z : 1; /* Zero flag. */
+		uint8_t c : 1; /* Carry flag. */
+		uint8_t h : 1; /* Half carry flag. */
+		uint8_t n : 1; /* Add/sub flag. */
+		uint8_t z : 1; /* Zero flag. */
 	} f_bits;
 	uint8_t a;
 
@@ -760,7 +761,7 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 
 	/* Return address that caused read error. */
 	(gb->gb_error)(gb, GB_INVALID_READ, addr);
-	// PGB_UNREACHABLE();
+	PGB_UNREACHABLE();
 }
 
 /**
@@ -1065,9 +1066,8 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 		}
 	}
 
-	/* Return address that caused write error. */
-	(gb->gb_error)(gb, GB_INVALID_WRITE, addr);
-	// PGB_UNREACHABLE();
+	/* Invalid writes are ignored. */
+	return;
 }
 
 uint8_t __gb_execute_cb(struct gb_s *gb)
@@ -1289,6 +1289,7 @@ static int compare_sprites(const void *in1, const void *in2)
 void __gb_draw_line(struct gb_s *gb)
 {
 	uint8_t pixels[160] = {0};
+	uint8_t bg_priority[20];
 
 	/* If LCD not initialised by front-end, don't render anything. */
 	if(gb->display.lcd_draw_line == NULL)
@@ -1349,6 +1350,8 @@ void __gb_draw_line(struct gb_s *gb)
 
 		uint16_t tile;
 
+		bg_priority[disp_x/8] = idx;
+
 		/* Select addressing mode. */
 		if(gb->hram_io[IO_LCDC] & LCDC_TILE_SELECT)
 			tile = VRAM_TILES_1 + idx * 0x10;
@@ -1378,6 +1381,8 @@ void __gb_draw_line(struct gb_s *gb)
 				tile += 2 * py;
 				t1 = gb->vram[tile];
 				t2 = gb->vram[tile + 1];
+
+				bg_priority[disp_x / 8] = idx;
 			}
 
 			/* copy background */
@@ -1544,6 +1549,9 @@ void __gb_draw_line(struct gb_s *gb)
 			// handle x flip
 			uint8_t dir, start, end, shift;
 
+			uint8_t bg_priority_tile;
+			uint8_t tile_has_priority;
+
 			if(OF & OBJ_FLIP_X)
 			{
 				dir = 1;
@@ -1559,25 +1567,30 @@ void __gb_draw_line(struct gb_s *gb)
 				shift = OX - (start + 1);
 			}
 
+			bg_priority_tile = bg_priority[start / 8];
+			tile_has_priority = OT < bg_priority_tile;
+
 			// copy tile
 			t1 >>= shift;
 			t2 >>= shift;
 
+			/* TODO: Put for loop within the to if statements
+			 * because the BG priority bit will be the same for
+			 * all the pixels in the tile. */
 			for(uint8_t disp_x = start; disp_x != end; disp_x += dir)
 			{
 				uint8_t c = (t1 & 0x1) | ((t2 & 0x1) << 1);
 				// check transparency / sprite overlap / background overlap
-#if 0
 
-				if(c
-						//	&& OX <= fx[disp_x]
-						&& !((OF & OBJ_PRIORITY)
-						     && ((pixels[disp_x] & 0x3)
-							 && fx[disp_x] == 0xFE)))
-#else
-				if(c && !(OF & OBJ_PRIORITY
-						&& pixels[disp_x] & 0x3))
-#endif
+				if(c && (OF & OBJ_PRIORITY) && tile_has_priority)
+				{
+					/* Set pixel colour. */
+					pixels[disp_x] ^= (OF & OBJ_PALETTE)
+						? gb->display.sp_palette[c + 4]
+						: gb->display.sp_palette[c];
+					pixels[disp_x] = ((~pixels[disp_x]) & 0x3);
+				}
+				else if(c && !(OF & OBJ_PRIORITY && (pixels[disp_x] & 0x3)))
 				{
 					/* Set pixel colour. */
 					pixels[disp_x] = (OF & OBJ_PALETTE)
@@ -1585,8 +1598,6 @@ void __gb_draw_line(struct gb_s *gb)
 							 : gb->display.sp_palette[c];
 					/* Set pixel palette (OBJ0 or OBJ1). */
 					pixels[disp_x] |= (OF & OBJ_PALETTE);
-					/* Deselect BG palette. */
-					pixels[disp_x] &= ~LCD_PALETTE_BG;
 				}
 
 				t1 = t1 >> 1;
@@ -2329,7 +2340,7 @@ void __gb_step_cpu(struct gb_s *gb)
 			/* This may be intentional, but this is required to stop an infinite
 			 * loop. */
 			(gb->gb_error)(gb, GB_HALT_FOREVER, gb->cpu_reg.pc.reg - 1);
-			// PGB_UNREACHABLE();
+			PGB_UNREACHABLE();
 		}
 
 		if(gb->hram_io[IO_SC] & SERIAL_SC_TX_START)
@@ -3246,7 +3257,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	default:
 		/* Return address where invlid opcode that was read. */
 		(gb->gb_error)(gb, GB_INVALID_OPCODE, gb->cpu_reg.pc.reg - 1);
-		// PGB_UNREACHABLE();
+		PGB_UNREACHABLE();
 	}
 
 	do
