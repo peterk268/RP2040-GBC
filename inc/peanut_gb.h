@@ -760,7 +760,7 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 
 	/* Return address that caused read error. */
 	(gb->gb_error)(gb, GB_INVALID_READ, addr);
-	PGB_UNREACHABLE();
+	// PGB_UNREACHABLE();
 }
 
 /**
@@ -1067,7 +1067,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 	/* Return address that caused write error. */
 	(gb->gb_error)(gb, GB_INVALID_WRITE, addr);
-	PGB_UNREACHABLE();
+	// PGB_UNREACHABLE();
 }
 
 uint8_t __gb_execute_cb(struct gb_s *gb)
@@ -2329,7 +2329,7 @@ void __gb_step_cpu(struct gb_s *gb)
 			/* This may be intentional, but this is required to stop an infinite
 			 * loop. */
 			(gb->gb_error)(gb, GB_HALT_FOREVER, gb->cpu_reg.pc.reg - 1);
-			PGB_UNREACHABLE();
+			// PGB_UNREACHABLE();
 		}
 
 		if(gb->hram_io[IO_SC] & SERIAL_SC_TX_START)
@@ -3246,7 +3246,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	default:
 		/* Return address where invlid opcode that was read. */
 		(gb->gb_error)(gb, GB_INVALID_OPCODE, gb->cpu_reg.pc.reg - 1);
-		PGB_UNREACHABLE();
+		// PGB_UNREACHABLE();
 	}
 
 	do
