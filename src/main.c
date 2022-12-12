@@ -60,6 +60,7 @@
 #include "peanut_gb.h"
 #include "mk_ili9225.h"
 #include "i2s.h"
+#include "gbcolors.h"
 
 /* GPIO Connections. */
 #define GPIO_UP		2
@@ -99,11 +100,7 @@ extern const unsigned char rom[];
 unsigned char rom_bank0[16384];
 static uint8_t ram[32768];
 static int lcd_line_busy = 0;
-static uint16_t palette[3][4] = {
-	{ 0xFFFF, 0x651F, 0x001F, 0x0000 },
-	{ 0xFFFF, 0xFC10, 0x89C7, 0x0000 },
-	{ 0xFFFF, 0x651F, 0x001F, 0x0000 }
-};
+static palette_t palette;	// Colour palette
 
 /* Multicore command structure. */
 union core_cmd {
@@ -199,7 +196,7 @@ void gb_cart_ram_write(struct gb_s *gb, const uint_fast32_t addr,
 /**
  * Ignore all errors.
  */
-void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
+void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t addr)
 {
 #if 1
 	const char* gb_err_str[4] = {
@@ -208,186 +205,9 @@ void gb_error(struct gb_s *gb, const enum gb_error_e gb_err, const uint16_t val)
 			"INVALID READ",
 			"INVALID WRITE"
 		};
-	printf("Error %d occurred: %s\n. Abort.\n",
-		gb_err,
-		gb_err >= GB_INVALID_MAX ?
-		gb_err_str[0] : gb_err_str[gb_err]);
+	printf("Error %d occurred: %s at %04X\n.\n", gb_err, gb_err_str[gb_err], addr);
 //	abort();
 #endif
-}
-
-/**
- * Automatically assigns a colour palette to the game using a given game
- * checksum.
- * TODO: Not all checksums are programmed in yet because I'm lazy.
- */
-void auto_assign_palette(uint16_t selected_palette[3][4], uint8_t game_checksum)
-{
-	size_t palette_bytes = 3 * 4 * sizeof(uint16_t);
-
-	switch(game_checksum)
-	{
-	/* Balloon Kid and Tetris Blast */
-	case 0x71:
-	case 0xFF:
-	{
-		const uint16_t palette[3][4] =
-		{
-			{ 0x7FFF, 0x7E60, 0x7C00, 0x0000 }, /* OBJ0 */
-			{ 0x7FFF, 0x7E60, 0x7C00, 0x0000 }, /* OBJ1 */
-			{ 0x7FFF, 0x7E60, 0x7C00, 0x0000 }  /* BG */
-		};
-		break;
-	}
-
-	/* Pokemon Yellow and Tetris */
-	case 0x15:
-	case 0xDB:
-	case 0x95: /* Not officially */
-	{
-		const uint16_t palette[3][4] =
-		{
-			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 }, /* OBJ0 */
-			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 }, /* OBJ1 */
-			{ 0x7FFF, 0x7FE0, 0x7C00, 0x0000 }  /* BG */
-		};
-		memcpy(selected_palette, palette, palette_bytes);
-		break;
-	}
-
-	/* Donkey Kong */
-	case 0x19:
-	{
-		const uint16_t palette[3][4] =
-		{
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ0 */
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ1 */
-			{ 0x7FFF, 0x7E60, 0x7C00, 0x0000 }  /* BG */
-		};
-		memcpy(selected_palette, palette, palette_bytes);
-		break;
-	}
-
-	/* Pokemon Blue */
-	case 0x61:
-	case 0x45:
-
-	/* Pokemon Blue Star */
-	case 0xD8:
-	{
-		const uint16_t palette[3][4] =
-		{
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ0 */
-			{ 0x7FFF, 0x329F, 0x001F, 0x0000 }, /* OBJ1 */
-			{ 0x7FFF, 0x329F, 0x001F, 0x0000 }  /* BG */
-		};
-		memcpy(selected_palette, palette, palette_bytes);
-		break;
-	}
-
-	/* Pokemon Red */
-	case 0x14:
-	{
-		const uint16_t palette[3][4] =
-		{
-			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 }, /* OBJ0 */
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ1 */
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }  /* BG */
-		};
-		memcpy(selected_palette, palette, palette_bytes);
-		break;
-	}
-
-	/* Pokemon Red Star */
-	case 0x8B:
-	{
-		const uint16_t palette[3][4] =
-		{
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }, /* OBJ0 */
-			{ 0x7FFF, 0x329F, 0x001F, 0x0000 }, /* OBJ1 */
-			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 }  /* BG */
-		};
-		memcpy(selected_palette, palette, palette_bytes);
-		break;
-	}
-
-	/* Kirby */
-	case 0x27:
-	case 0x49:
-	case 0x5C:
-	case 0xB3:
-	{
-		const uint16_t palette[3][4] =
-		{
-			{ 0x7D8A, 0x6800, 0x3000, 0x0000 }, /* OBJ0 */
-			{ 0x001F, 0x7FFF, 0x7FEF, 0x021F }, /* OBJ1 */
-			{ 0x527F, 0x7FE0, 0x0180, 0x0000 }  /* BG */
-		};
-		memcpy(selected_palette, palette, palette_bytes);
-		break;
-	}
-
-	/* Donkey Kong Land [1/2/III] */
-	case 0x18:
-	case 0x6A:
-	case 0x4B:
-	case 0x6B:
-	{
-		const uint16_t palette[3][4] =
-		{
-			{ 0x7F08, 0x7F40, 0x48E0, 0x2400 }, /* OBJ0 */
-			{ 0x7FFF, 0x2EFF, 0x7C00, 0x001F }, /* OBJ1 */
-			{ 0x7FFF, 0x463B, 0x2951, 0x0000 }  /* BG */
-		};
-		memcpy(selected_palette, palette, palette_bytes);
-		break;
-	}
-
-	/* Link's Awakening */
-	case 0x70:
-	{
-		const uint16_t palette[3][4] =
-		{
-			{ 0x7FFF, 0x03E0, 0x1A00, 0x0120 }, /* OBJ0 */
-			{ 0x7FFF, 0x329F, 0x001F, 0x001F }, /* OBJ1 */
-			{ 0x7FFF, 0x7E10, 0x48E7, 0x0000 }  /* BG */
-		};
-		memcpy(selected_palette, palette, palette_bytes);
-		break;
-	}
-
-	/* Mega Man [1/2/3] & others I don't care about. */
-	case 0x01:
-	case 0x10:
-	case 0x29:
-	case 0x52:
-	case 0x5D:
-	case 0x68:
-	case 0x6D:
-	case 0xF6:
-	{
-		const uint16_t palette[3][4] =
-		{
-			{ 0x7FFF, 0x329F, 0x001F, 0x0000 }, /* OBJ0 */
-			{ 0x7FFF, 0x3FE6, 0x0200, 0x0000 }, /* OBJ1 */
-			{ 0x7FFF, 0x7EAC, 0x40C0, 0x0000 }  /* BG */
-		};
-		memcpy(selected_palette, palette, palette_bytes);
-		break;
-	}
-
-	default:
-	{
-		const uint16_t palette[3][4] =
-		{
-			{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
-			{ 0x7FFF, 0x5294, 0x294A, 0x0000 },
-			{ 0x7FFF, 0x5294, 0x294A, 0x0000 }
-		};
-		printf("No palette found for 0x%02X.\n", game_checksum);
-		memcpy(selected_palette, palette, palette_bytes);
-	}
-	}
 }
 
 void core1_irq_dma_lcd_end_transfer(void)
@@ -541,7 +361,7 @@ int main(void)
 {
 	static struct gb_s gb;
 	enum gb_init_error_e ret;
-
+	
 	/* Overclock. */
 	{
 		const unsigned vco = 1596*1000*1000;	/* 266MHz */
@@ -674,7 +494,46 @@ int main(void)
 	putstdio("AUDIO ");
 #endif
 
-	auto_assign_palette(palette, gb_colour_hash(&gb));
+	/* Update buttons state */
+	gb.direct.joypad_bits.up=gpio_get(GPIO_UP);
+	gb.direct.joypad_bits.down=gpio_get(GPIO_DOWN);
+	gb.direct.joypad_bits.left=gpio_get(GPIO_LEFT);
+	gb.direct.joypad_bits.right=gpio_get(GPIO_RIGHT);
+	gb.direct.joypad_bits.a=gpio_get(GPIO_A);
+	gb.direct.joypad_bits.b=gpio_get(GPIO_B);
+	gb.direct.joypad_bits.select=gpio_get(GPIO_SELECT);
+	gb.direct.joypad_bits.start=gpio_get(GPIO_START);
+
+	/* manually assign a palette with button combo   */  
+	if(!gb.direct.joypad_bits.right) {
+		get_colour_palette(palette,0x05,0x00);	/* Right */
+	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.down) {
+		get_colour_palette(palette,0x07,0x00);	/* A + Down */
+	} else if(!gb.direct.joypad_bits.up) {
+		get_colour_palette(palette,0x12,0x00);	/* Up */
+	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.right) {
+		get_colour_palette(palette,0x13,0x00);	/* B + Right */
+	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.left) {
+		get_colour_palette(palette,0x16,0x00);	/* B + Left (Game Boy Pocket Palette, shades of gray) */
+	} else if(!gb.direct.joypad_bits.down) {
+		get_colour_palette(palette,0x17,0x00);	/* Down */
+	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.up) {
+		get_colour_palette(palette,0x19,0x03);	/* B + Up */
+	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.right) {
+		get_colour_palette(palette,0x1C,0x03);	/* A + Right */
+	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.left) {
+		get_colour_palette(palette,0x0D,0x05);	/* A + Left */
+	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.up) {
+		get_colour_palette(palette,0x10,0x05);	/* A + Up */
+	} else if(!gb.direct.joypad_bits.left) {
+		get_colour_palette(palette,0x18,0x05);	/* Left */
+	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.down) {
+		get_colour_palette(palette,0x1A,0x05);	/* B + Down */
+	} else {
+		/* Automatically assign a colour palette to the game */
+		char rom_title[16];
+		auto_assign_palette(palette, gb_colour_hash(&gb),gb_get_rom_name(&gb,rom_title));
+	}
 
 	putstdio("\n> ");
 	uint_fast32_t frames = 0;
@@ -693,7 +552,6 @@ int main(void)
 		frames++;
 #if ENABLE_SOUND
 		audio_callback(NULL, stream, AUDIO_BUFFER_SIZE_BYTES);
-		// i2s_write(&i2s_config,stream,AUDIO_SAMPLES);
 		i2s_dma_write(&i2s_config, stream);
 #endif
 
@@ -809,6 +667,7 @@ int main(void)
 		}
 
 		case 'z':
+		case 'w':
 		{
 			gb.direct.joypad_bits.a = 0;
 			break;
