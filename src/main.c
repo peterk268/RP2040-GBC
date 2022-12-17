@@ -71,7 +71,6 @@
 #define GPIO_B		7
 #define GPIO_SELECT	8
 #define GPIO_START	9
-#define GPIO_BUZZER	15
 #define GPIO_CS		17
 #define GPIO_CLK	18
 #define GPIO_SDA	19
@@ -101,6 +100,18 @@ unsigned char rom_bank0[16384];
 static uint8_t ram[32768];
 static int lcd_line_busy = 0;
 static palette_t palette;	// Colour palette
+
+static struct
+{
+	unsigned a	: 1;
+	unsigned b	: 1;
+	unsigned select	: 1;
+	unsigned start	: 1;
+	unsigned right	: 1;
+	unsigned left	: 1;
+	unsigned up	: 1;
+	unsigned down	: 1;
+} prev_joypad_bits;
 
 /* Multicore command structure. */
 union core_cmd {
@@ -249,7 +260,7 @@ _Noreturn
 void main_core1(void)
 {
 	static dma_channel_config c2;
-	static const uint16_t clear_screen_colour = 0x0000;
+	uint16_t clear_screen_colour = palette[2][3];
 	union core_cmd cmd;
 
 	/* Initialise and control LCD on core 1. */
@@ -387,7 +398,6 @@ int main(void)
 	gpio_set_function(GPIO_B, GPIO_FUNC_SIO);
 	gpio_set_function(GPIO_SELECT, GPIO_FUNC_SIO);
 	gpio_set_function(GPIO_START, GPIO_FUNC_SIO);
-	gpio_set_function(GPIO_BUZZER, GPIO_FUNC_PWM);
 	gpio_set_function(GPIO_CS, GPIO_FUNC_SIO);
 	gpio_set_function(GPIO_CLK, GPIO_FUNC_SPI);
 	gpio_set_function(GPIO_SDA, GPIO_FUNC_SPI);
@@ -403,7 +413,6 @@ int main(void)
 	gpio_set_dir(GPIO_B, false);
 	gpio_set_dir(GPIO_SELECT, false);
 	gpio_set_dir(GPIO_START, false);
-	gpio_set_dir(GPIO_BUZZER, true);
 	gpio_set_dir(GPIO_CS, true);
 	gpio_set_dir(GPIO_RS, true);
 	gpio_set_dir(GPIO_RST, true);
@@ -427,12 +436,6 @@ int main(void)
 	spi_init(spi0, 30*1000*1000);
 	spi_set_format(spi0, 16, SPI_CPOL_0, SPI_CPHA_0, SPI_MSB_FIRST);
 
-	/* Start Core1, which processes requests to the LCD. */
-#if ENABLE_LCD
-	putstdio("CORE1 ");
-	multicore_launch_core1(main_core1);
-#endif
-
 	/* Initialise GB context. */
 	memcpy(rom_bank0, rom, sizeof(rom_bank0));
 	ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read,
@@ -445,9 +448,56 @@ int main(void)
 		goto sleep;
 	}
 
+	/* Update buttons state */
+	gb.direct.joypad_bits.up=gpio_get(GPIO_UP);
+	gb.direct.joypad_bits.down=gpio_get(GPIO_DOWN);
+	gb.direct.joypad_bits.left=gpio_get(GPIO_LEFT);
+	gb.direct.joypad_bits.right=gpio_get(GPIO_RIGHT);
+	gb.direct.joypad_bits.a=gpio_get(GPIO_A);
+	gb.direct.joypad_bits.b=gpio_get(GPIO_B);
+	gb.direct.joypad_bits.select=gpio_get(GPIO_SELECT);
+	gb.direct.joypad_bits.start=gpio_get(GPIO_START);
+
+	/* manually assign a palette with button combo   */  
+	if(!gb.direct.joypad_bits.right) {
+		get_colour_palette(palette,0x05,0x00);	/* Right */
+	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.down) {
+		get_colour_palette(palette,0x07,0x00);	/* A + Down */
+	} else if(!gb.direct.joypad_bits.up) {
+		get_colour_palette(palette,0x12,0x00);	/* Up */
+	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.right) {
+		get_colour_palette(palette,0x13,0x00);	/* B + Right */
+	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.left) {
+		get_colour_palette(palette,0x16,0x00);	/* B + Left (Game Boy Pocket Palette, shades of gray) */
+	} else if(!gb.direct.joypad_bits.down) {
+		get_colour_palette(palette,0x17,0x00);	/* Down */
+	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.up) {
+		get_colour_palette(palette,0x19,0x03);	/* B + Up */
+	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.right) {
+		get_colour_palette(palette,0x1C,0x03);	/* A + Right */
+	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.left) {
+		get_colour_palette(palette,0x0D,0x05);	/* A + Left */
+	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.up) {
+		get_colour_palette(palette,0x10,0x05);	/* A + Up */
+	} else if(!gb.direct.joypad_bits.left) {
+		get_colour_palette(palette,0x18,0x05);	/* Left */
+	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.down) {
+		get_colour_palette(palette,0x1A,0x05);	/* B + Down */
+	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.b) {
+		get_colour_palette(palette,0xFF,0xFF);	/* A + B */
+	} else {
+		/* Automatically assign a colour palette to the game */
+		char rom_title[16];
+		auto_assign_palette(palette, gb_colour_hash(&gb),gb_get_rom_name(&gb,rom_title));
+	}
+
 #if ENABLE_LCD
 	gb_init_lcd(&gb, &lcd_draw_line);
 	{
+		/* Start Core1, which processes requests to the LCD. */
+		putstdio("CORE1 ");
+		multicore_launch_core1(main_core1);
+
 		/* initialise pixel buffer copy DMA. */
 		static dma_channel_config dma_config;
 		gb_priv.dma_pixel_buffer_chan = dma_claim_unused_channel(true);
@@ -486,6 +536,7 @@ int main(void)
 	i2s_config_t i2s_config = i2s_get_default_config();
 	i2s_config.sample_freq=AUDIO_SAMPLE_RATE;
 	i2s_config.dma_trans_count =AUDIO_SAMPLES;
+	i2s_volume(&i2s_config,2);
 	i2s_init(&i2s_config);
 	
 	// Initialize audio emulation
@@ -493,47 +544,6 @@ int main(void)
 	
 	putstdio("AUDIO ");
 #endif
-
-	/* Update buttons state */
-	gb.direct.joypad_bits.up=gpio_get(GPIO_UP);
-	gb.direct.joypad_bits.down=gpio_get(GPIO_DOWN);
-	gb.direct.joypad_bits.left=gpio_get(GPIO_LEFT);
-	gb.direct.joypad_bits.right=gpio_get(GPIO_RIGHT);
-	gb.direct.joypad_bits.a=gpio_get(GPIO_A);
-	gb.direct.joypad_bits.b=gpio_get(GPIO_B);
-	gb.direct.joypad_bits.select=gpio_get(GPIO_SELECT);
-	gb.direct.joypad_bits.start=gpio_get(GPIO_START);
-
-	/* manually assign a palette with button combo   */  
-	if(!gb.direct.joypad_bits.right) {
-		get_colour_palette(palette,0x05,0x00);	/* Right */
-	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.down) {
-		get_colour_palette(palette,0x07,0x00);	/* A + Down */
-	} else if(!gb.direct.joypad_bits.up) {
-		get_colour_palette(palette,0x12,0x00);	/* Up */
-	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.right) {
-		get_colour_palette(palette,0x13,0x00);	/* B + Right */
-	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.left) {
-		get_colour_palette(palette,0x16,0x00);	/* B + Left (Game Boy Pocket Palette, shades of gray) */
-	} else if(!gb.direct.joypad_bits.down) {
-		get_colour_palette(palette,0x17,0x00);	/* Down */
-	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.up) {
-		get_colour_palette(palette,0x19,0x03);	/* B + Up */
-	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.right) {
-		get_colour_palette(palette,0x1C,0x03);	/* A + Right */
-	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.left) {
-		get_colour_palette(palette,0x0D,0x05);	/* A + Left */
-	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.up) {
-		get_colour_palette(palette,0x10,0x05);	/* A + Up */
-	} else if(!gb.direct.joypad_bits.left) {
-		get_colour_palette(palette,0x18,0x05);	/* Left */
-	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.down) {
-		get_colour_palette(palette,0x1A,0x05);	/* B + Down */
-	} else {
-		/* Automatically assign a colour palette to the game */
-		char rom_title[16];
-		auto_assign_palette(palette, gb_colour_hash(&gb),gb_get_rom_name(&gb,rom_title));
-	}
 
 	putstdio("\n> ");
 	uint_fast32_t frames = 0;
@@ -556,6 +566,14 @@ int main(void)
 #endif
 
 		/* Update buttons state */
+		prev_joypad_bits.up=gb.direct.joypad_bits.up;
+		prev_joypad_bits.down=gb.direct.joypad_bits.down;
+		prev_joypad_bits.left=gb.direct.joypad_bits.left;
+		prev_joypad_bits.right=gb.direct.joypad_bits.right;
+		prev_joypad_bits.a=gb.direct.joypad_bits.a;
+		prev_joypad_bits.b=gb.direct.joypad_bits.b;
+		prev_joypad_bits.select=gb.direct.joypad_bits.select;
+		prev_joypad_bits.start=gb.direct.joypad_bits.start;
 		gb.direct.joypad_bits.up=gpio_get(GPIO_UP);
 		gb.direct.joypad_bits.down=gpio_get(GPIO_DOWN);
 		gb.direct.joypad_bits.left=gpio_get(GPIO_LEFT);
@@ -564,6 +582,20 @@ int main(void)
 		gb.direct.joypad_bits.b=gpio_get(GPIO_B);
 		gb.direct.joypad_bits.select=gpio_get(GPIO_SELECT);
 		gb.direct.joypad_bits.start=gpio_get(GPIO_START);
+
+		/* hotkeys (select + * combo)*/
+		if(!gb.direct.joypad_bits.select) {
+#if ENABLE_SOUND
+			if(!gb.direct.joypad_bits.up && prev_joypad_bits.up) {
+				/* select + up */
+				i2s_increase_volume(&i2s_config);
+			}
+			if(!gb.direct.joypad_bits.down && prev_joypad_bits.down) {
+				/* select + down */
+				i2s_decrease_volume(&i2s_config);
+			}
+#endif
+		}
 
 		/* Serial monitor commands */ 
 		input = getchar_timeout_us(0);

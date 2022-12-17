@@ -559,6 +559,17 @@ void get_colour_palette(palette_t selected_palette,uint8_t table_entry,uint8_t s
 		memcpy(selected_palette, palette, PALETTE_SIZE_IN_BYTES);
 		return;
 	}
+	if(table_entry==0xFF && shuffling_flags==0xFF)
+	{
+		/* Game Boy DMG palette (4 shades of green) */
+		const palette_t palette = 	{
+			{ 0x7C02, 0x5BC8, 0x3AC9, 0x2A07 }, /* OBJ0 */
+			{ 0x7C02, 0x5BC8, 0x3AC9, 0x2A07 }, /* OBJ1 */
+			{ 0x7C02, 0x5BC8, 0x3AC9, 0x2A07 }  /* BG */
+		};
+		memcpy(selected_palette, palette, PALETTE_SIZE_IN_BYTES);
+		return;
+	}
 	/* default palette */
 	printf("get_colour_palette: No palette found for table_entry=0x%02X shuffling_flags=0x%02X\n",
 		table_entry,
