@@ -98,7 +98,7 @@ void i2s_init(i2s_config_t *i2s_config) {
  *        len: length of sample in 32 bits words
  */
 void i2s_write(const i2s_config_t *i2s_config,const int16_t *samples,const size_t len) {
-    for(size_t i=0;i<len;i+=2) {
+    for(size_t i=0;i<len;i++) {
             pio_sm_put_blocking(i2s_config->pio, i2s_config->sm, (uint32_t)samples[i]);
     }
 }
