@@ -459,30 +459,31 @@ int main(void)
 	gb.direct.joypad_bits.start=gpio_get(GPIO_START);
 
 	/* manually assign a palette with button combo   */  
-	if(!gb.direct.joypad_bits.right) {
-		get_colour_palette(palette,0x05,0x00);	/* Right */
+
+	if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.up) {
+		get_colour_palette(palette,0x10,0x05);	/* A + Up */
 	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.down) {
 		get_colour_palette(palette,0x07,0x00);	/* A + Down */
-	} else if(!gb.direct.joypad_bits.up) {
-		get_colour_palette(palette,0x12,0x00);	/* Up */
-	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.right) {
-		get_colour_palette(palette,0x13,0x00);	/* B + Right */
-	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.left) {
-		get_colour_palette(palette,0x16,0x00);	/* B + Left (Game Boy Pocket Palette, shades of gray) */
-	} else if(!gb.direct.joypad_bits.down) {
-		get_colour_palette(palette,0x17,0x00);	/* Down */
-	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.up) {
-		get_colour_palette(palette,0x19,0x03);	/* B + Up */
 	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.right) {
 		get_colour_palette(palette,0x1C,0x03);	/* A + Right */
 	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.left) {
 		get_colour_palette(palette,0x0D,0x05);	/* A + Left */
-	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.up) {
-		get_colour_palette(palette,0x10,0x05);	/* A + Up */
-	} else if(!gb.direct.joypad_bits.left) {
-		get_colour_palette(palette,0x18,0x05);	/* Left */
+	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.up) {
+		get_colour_palette(palette,0x19,0x03);	/* B + Up */
 	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.down) {
 		get_colour_palette(palette,0x1A,0x05);	/* B + Down */
+	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.right) {
+		get_colour_palette(palette,0x13,0x00);	/* B + Right */
+	} else if(!gb.direct.joypad_bits.b && !gb.direct.joypad_bits.left) {
+		get_colour_palette(palette,0x16,0x00);	/* B + Left (Game Boy Pocket Palette, shades of gray) */
+	} else if(!gb.direct.joypad_bits.up) {
+		get_colour_palette(palette,0x12,0x00);	/* Up */
+	} else if(!gb.direct.joypad_bits.down) {
+		get_colour_palette(palette,0x17,0x00);	/* Down */
+	} else if(!gb.direct.joypad_bits.right) {
+		get_colour_palette(palette,0x05,0x00);	/* Right */
+	} else if(!gb.direct.joypad_bits.left) {
+		get_colour_palette(palette,0x18,0x05);	/* Left */
 	} else if(!gb.direct.joypad_bits.a && !gb.direct.joypad_bits.b) {
 		get_colour_palette(palette,0xFF,0xFF);	/* A + B */
 	} else {
