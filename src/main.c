@@ -59,6 +59,7 @@
 #include "minigb_apu.h"
 #include "peanut_gb.h"
 #include "mk_ili9225.h"
+#include "sdcard.h"
 #include "i2s.h"
 #include "gbcolors.h"
 
@@ -276,9 +277,10 @@ void main_core1(void)
 	channel_config_set_ring(&c2, false, 0);
 
 	/* Enable IRQ for wake on interrupt functionality. */
-	irq_set_exclusive_handler(DMA_IRQ_0, core1_irq_dma_lcd_end_transfer);
-	dma_channel_set_irq0_enabled(dma_lcd, true);
-	irq_set_enabled(DMA_IRQ_0, true);
+	/* Use DMA_IRQ_1, DMA_IRQ_0 is already used by the SD Card reader */
+	irq_set_exclusive_handler(DMA_IRQ_1, core1_irq_dma_lcd_end_transfer);
+	dma_channel_set_irq1_enabled(dma_lcd, true);
+	irq_set_enabled(DMA_IRQ_1, true);
 
 	/* Clear LCD screen. */
 	mk_ili9225_write_pixels_start();
@@ -368,6 +370,71 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
 }
 #endif
 
+void read_cart_ram_file(struct gb_s *gb) {
+	/* Load Save File. */
+	char filename[16];
+	uint_fast32_t save_size;
+	UINT bw;
+	
+	save_size=gb_get_save_size(gb);
+	if(save_size>0) {
+		sd_card_t *pSD=sd_get_by_num(0);
+		FRESULT fr=f_mount(&pSD->fatfs,pSD->pcName,1);
+		if (FR_OK!=fr) {
+			printf("f_mount error: %s (%d)\n",FRESULT_str(fr),fr);
+			return;
+		}
+
+		gb_get_rom_name(gb,filename);
+		FIL fil;
+		fr=f_open(&fil,filename,FA_READ);
+		if (fr==FR_OK) {
+			f_read(&fil,ram,save_size,&bw);
+		} else {
+			printf("f_open(%s) error: %s (%d)\n",filename,FRESULT_str(fr),fr);
+		}
+		
+		fr=f_close(&fil);
+		if(fr!=FR_OK) {
+			printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
+		}
+		f_unmount(pSD->pcName);
+	}
+	printf("read_cart_ram_file(%s) COMPLETE (%lu bytes)\n",filename,save_size);
+}
+
+void write_cart_ram_file(struct gb_s *gb) {
+	char filename[16];
+	uint_fast32_t save_size;
+	UINT bw;
+	
+	gb_get_rom_name(gb,filename);
+	save_size=gb_get_save_size(gb);
+	if(save_size>0) {
+		sd_card_t *pSD=sd_get_by_num(0);
+		FRESULT fr=f_mount(&pSD->fatfs,pSD->pcName,1);
+		if (FR_OK!=fr) {
+			printf("f_mount error: %s (%d)\n",FRESULT_str(fr),fr);
+			return;
+		}
+
+		FIL fil;
+		fr=f_open(&fil,filename,FA_CREATE_ALWAYS | FA_WRITE);
+		if (fr==FR_OK) {
+			f_write(&fil,ram,save_size,&bw);
+		} else {
+			printf("f_open(%s) error: %s (%d)\n",filename,FRESULT_str(fr),fr);
+		}
+		
+		fr=f_close(&fil);
+		if(fr!=FR_OK) {
+			printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
+		}
+		f_unmount(pSD->pcName);
+	}
+	printf("write_cart_ram_file(%s) COMPLETE (%lu bytes)\n",filename,save_size);
+}
+
 int main(void)
 {
 	static struct gb_s gb;
@@ -386,7 +453,8 @@ int main(void)
 
 	/* Initialise USB serial connection for debugging. */
 	stdio_init_all();
-	//(void) getchar();
+	time_init();
+	sleep_ms(500);
 	putstdio("INIT: ");
 
 	/* Initialise GPIO pins. */
@@ -438,6 +506,7 @@ int main(void)
 
 	/* Initialise GB context. */
 	memcpy(rom_bank0, rom, sizeof(rom_bank0));
+	
 	ret = gb_init(&gb, &gb_rom_read, &gb_cart_ram_read,
 		      &gb_cart_ram_write, &gb_error, &gb_priv);
 	putstdio("GB ");
@@ -447,6 +516,9 @@ int main(void)
 		printf("Error: %d\n", ret);
 		goto sleep;
 	}
+
+	/* Load Save File. */
+	read_cart_ram_file(&gb);
 
 	/* Update buttons state */
 	gb.direct.joypad_bits.up=gpio_get(GPIO_UP);
@@ -596,6 +668,10 @@ int main(void)
 				i2s_decrease_volume(&i2s_config);
 			}
 #endif
+			if(!gb.direct.joypad_bits.start && prev_joypad_bits.start) {
+				write_cart_ram_file(&gb);
+				gb_reset(&gb);
+			}
 		}
 
 		/* Serial monitor commands */ 

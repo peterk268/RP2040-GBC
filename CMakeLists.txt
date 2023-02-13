@@ -8,6 +8,8 @@ set(CMAKE_CXX_STANDARD 17)
 
 pico_sdk_init()
 
+add_subdirectory(ext/FatFs_SPI build)
+
 add_executable(RP2040_GB
         src/main.c
         src/rom.c
@@ -21,6 +23,7 @@ pico_generate_pio_header(RP2040_GB ${CMAKE_CURRENT_LIST_DIR}/ext/i2s/audio_i2s.p
 target_include_directories(RP2040_GB PRIVATE inc ext/minigb_apu ext/i2s)
 
 target_link_libraries(RP2040_GB
+        FatFs_SPI
         pico_stdlib pico_stdio pico_bootrom pico_multicore pico_stdio  pico_multicore
         hardware_clocks hardware_pio hardware_vreg hardware_pio
         hardware_sync hardware_pll hardware_spi hardware_irq hardware_dma
