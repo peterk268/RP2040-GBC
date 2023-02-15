@@ -1,7 +1,7 @@
 /**
  * MIT License
  *
- * Copyright (c) 2018-2022 Mahyar Koshkouei
+ * Copyright (c) 2018-2023 Mahyar Koshkouei
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to
@@ -91,12 +91,6 @@
 /* Adds more code to improve LCD rendering accuracy. */
 #ifndef PEANUT_GB_HIGH_LCD_ACCURACY
 # define PEANUT_GB_HIGH_LCD_ACCURACY 1
-#endif
-
-/* Play BIOS before playing cartridge.
- * This setting is currently not implemented. */
-#ifndef PEANUT_GB_USE_BIOS
-# define PEANUT_GB_USE_BIOS 0
 #endif
 
 /* Use intrinsic functions. This may produce smaller and faster code. */
@@ -322,6 +316,26 @@
 	gb->cpu_reg.f_bits.n = 1;						\
 	gb->cpu_reg.f_bits.z = (r == 0x00);
 
+#define PGB_INSTR_XOR_R8(r)							\
+	gb->cpu_reg.a ^= r;							\
+	gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);				\
+	gb->cpu_reg.f_bits.n = 0;						\
+	gb->cpu_reg.f_bits.h = 0;						\
+	gb->cpu_reg.f_bits.c = 0;
+
+#define PGB_INSTR_OR_R8(r)							\
+	gb->cpu_reg.a |= r;							\
+	gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);				\
+	gb->cpu_reg.f_bits.n = 0;						\
+	gb->cpu_reg.f_bits.h = 0;						\
+	gb->cpu_reg.f_bits.c = 0;
+
+#define PGB_INSTR_AND_R8(r)							\
+	gb->cpu_reg.a &= r;							\
+	gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);				\
+	gb->cpu_reg.f_bits.n = 0;						\
+	gb->cpu_reg.f_bits.h = 1;						\
+	gb->cpu_reg.f_bits.c = 0;
 
 #if PEANUT_GB_IS_LITTLE_ENDIAN
 # define PEANUT_GB_GET_LSB16(x) (x & 0xFF)
@@ -410,40 +424,6 @@ struct count_s
 	uint_fast16_t tima_count;	/* Timer Counter */
 	uint_fast16_t serial_count;	/* Serial Counter */
 };
-
-#define IO_JOYP	0x00
-#define IO_SB	0x01
-#define IO_SC	0x02
-#define IO_DIV	0x04
-#define IO_TIMA	0x05
-#define IO_TMA	0x06
-#define IO_TAC	0x07
-#define IO_IF	0x0F
-#define IO_BOOT	0x50
-#define IO_LCDC	0x40
-#define IO_STAT	0x41
-#define IO_SCY	0x42
-#define IO_SCX	0x43
-#define IO_LY	0x44
-#define IO_LYC	0x45
-#define	IO_DMA	0x46
-#define	IO_BGP	0x47
-#define	IO_OBP0	0x48
-#define IO_OBP1	0x49
-#define IO_WY	0x4A
-#define IO_WX	0x4B
-#define IO_BR	0x50
-#define IO_IE	0xFF
-
-#define IO_TAC_RATE_MASK	0x3
-#define IO_TAC_ENABLE_MASK	0x4
-
-/* LCD Mode defines. */
-#define IO_STAT_MODE_HBLANK		0
-#define IO_STAT_MODE_VBLANK		1
-#define IO_STAT_MODE_SEARCH_OAM		2
-#define IO_STAT_MODE_SEARCH_TRANSFER	3
-#define IO_STAT_MODE_VBLANK_OR_TRANSFER_MASK 0x1
 
 #if ENABLE_LCD
 	/* Bit mask for the shade of pixel to display */
@@ -546,14 +526,14 @@ struct gb_s
 	void (*gb_serial_tx)(struct gb_s*, const uint8_t tx);
 	enum gb_serial_rx_ret_e (*gb_serial_rx)(struct gb_s*, uint8_t* rx);
 
-	uint8_t (*gb_bios_read)(struct gb_s*, const uint_fast16_t);
+	/* Read byte from boot ROM at given address. */
+	uint8_t (*gb_bootrom_read)(struct gb_s*, const uint_fast16_t addr);
 
 	struct
 	{
 		unsigned gb_halt	: 1;
 		unsigned gb_ime		: 1;
 		unsigned gb_frame	: 1; /* New frame drawn. */
-
 		unsigned lcd_blank	: 1;
 	};
 
@@ -670,6 +650,41 @@ struct gb_s
 };
 
 #ifndef PEANUT_GB_HEADER_ONLY
+
+#define IO_JOYP	0x00
+#define IO_SB	0x01
+#define IO_SC	0x02
+#define IO_DIV	0x04
+#define IO_TIMA	0x05
+#define IO_TMA	0x06
+#define IO_TAC	0x07
+#define IO_IF	0x0F
+#define IO_BOOT	0x50
+#define IO_LCDC	0x40
+#define IO_STAT	0x41
+#define IO_SCY	0x42
+#define IO_SCX	0x43
+#define IO_LY	0x44
+#define IO_LYC	0x45
+#define	IO_DMA	0x46
+#define	IO_BGP	0x47
+#define	IO_OBP0	0x48
+#define IO_OBP1	0x49
+#define IO_WY	0x4A
+#define IO_WX	0x4B
+#define IO_BANK	0x50
+#define IO_IE	0xFF
+
+#define IO_TAC_RATE_MASK	0x3
+#define IO_TAC_ENABLE_MASK	0x4
+
+/* LCD Mode defines. */
+#define IO_STAT_MODE_HBLANK		0
+#define IO_STAT_MODE_VBLANK		1
+#define IO_STAT_MODE_SEARCH_OAM		2
+#define IO_STAT_MODE_SEARCH_TRANSFER	3
+#define IO_STAT_MODE_VBLANK_OR_TRANSFER_MASK 0x1
+
 /**
  * Internal function used to read bytes.
  * addr is host platform endian.
@@ -679,11 +694,11 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 	switch(PEANUT_GB_GET_MSN16(addr))
 	{
 	case 0x0:
-		/* IO_BR is only set to 1 if gb->gb_bios_read was not NULL on
-		 * reset. */
-		if(gb->hram_io[IO_BR] == 0 && addr < 0x0100)
+		/* IO_BANK is only set to 1 if gb->gb_bootrom_read was not NULL
+		 * on reset. */
+		if(gb->hram_io[IO_BANK] == 0 && addr < 0x0100)
 		{
-			return gb->gb_bios_read(gb, addr);
+			return gb->gb_bootrom_read(gb, addr);
 		}
 
 		/* Fallthrough */
@@ -1068,7 +1083,7 @@ void __gb_write(struct gb_s *gb, const uint_fast16_t addr, const uint8_t val)
 
 		/* Turn off boot ROM */
 		case 0x50:
-			gb->hram_io[IO_BR] = val;
+			gb->hram_io[IO_BANK] = val;
 			return;
 
 		/* Interrupt Enable Register */
@@ -2447,11 +2462,8 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0x86: /* ADD A, (HL) */
-	{
-		uint8_t val = __gb_read(gb, gb->cpu_reg.hl.reg);
-		PGB_INSTR_ADC_R8(val, 0);
+		PGB_INSTR_ADC_R8(__gb_read(gb, gb->cpu_reg.hl.reg), 0);
 		break;
-	}
 
 	case 0x87: /* ADD A, A */
 		PGB_INSTR_ADC_R8(gb->cpu_reg.a, 0);
@@ -2482,11 +2494,8 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0x8E: /* ADC A, (HL) */
-	{
-		uint8_t val = __gb_read(gb, gb->cpu_reg.hl.reg);
-		PGB_INSTR_ADC_R8(val, gb->cpu_reg.f_bits.c);
+		PGB_INSTR_ADC_R8(__gb_read(gb, gb->cpu_reg.hl.reg), gb->cpu_reg.f_bits.c);
 		break;
-	}
 
 	case 0x8F: /* ADC A, A */
 		PGB_INSTR_ADC_R8(gb->cpu_reg.a, gb->cpu_reg.f_bits.c);
@@ -2517,11 +2526,8 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0x96: /* SUB (HL) */
-	{
-		uint8_t val = __gb_read(gb, gb->cpu_reg.hl.reg);
-		PGB_INSTR_SBC_R8(val, 0);
+		PGB_INSTR_SBC_R8(__gb_read(gb, gb->cpu_reg.hl.reg), 0);
 		break;
-	}
 
 	case 0x97: /* SUB A */
 		gb->cpu_reg.a = 0;
@@ -2556,11 +2562,8 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0x9E: /* SBC A, (HL) */
-	{
-		uint8_t val = __gb_read(gb, gb->cpu_reg.hl.reg);
-		PGB_INSTR_SBC_R8(val, gb->cpu_reg.f_bits.c);
+		PGB_INSTR_SBC_R8(__gb_read(gb, gb->cpu_reg.hl.reg), gb->cpu_reg.f_bits.c);
 		break;
-	}
 
 	case 0x9F: /* SBC A, A */
 		gb->cpu_reg.a = gb->cpu_reg.f_bits.c ? 0xFF : 0x00;
@@ -2570,193 +2573,99 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0xA0: /* AND B */
-		gb->cpu_reg.a = gb->cpu_reg.a & gb->cpu_reg.bc.bytes.b;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 1;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_AND_R8(gb->cpu_reg.bc.bytes.b);
 		break;
 
 	case 0xA1: /* AND C */
-		gb->cpu_reg.a = gb->cpu_reg.a & gb->cpu_reg.bc.bytes.c;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 1;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_AND_R8(gb->cpu_reg.bc.bytes.c);
 		break;
 
 	case 0xA2: /* AND D */
-		gb->cpu_reg.a = gb->cpu_reg.a & gb->cpu_reg.de.bytes.d;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 1;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_AND_R8(gb->cpu_reg.de.bytes.d);
 		break;
 
 	case 0xA3: /* AND E */
-		gb->cpu_reg.a = gb->cpu_reg.a & gb->cpu_reg.de.bytes.e;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 1;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_AND_R8(gb->cpu_reg.de.bytes.e);
 		break;
 
 	case 0xA4: /* AND H */
-		gb->cpu_reg.a = gb->cpu_reg.a & gb->cpu_reg.hl.bytes.h;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 1;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_AND_R8(gb->cpu_reg.hl.bytes.h);
 		break;
 
 	case 0xA5: /* AND L */
-		gb->cpu_reg.a = gb->cpu_reg.a & gb->cpu_reg.hl.bytes.l;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 1;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_AND_R8(gb->cpu_reg.hl.bytes.l);
 		break;
 
 	case 0xA6: /* AND (HL) */
-		gb->cpu_reg.a = gb->cpu_reg.a & __gb_read(gb, gb->cpu_reg.hl.reg);
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 1;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_AND_R8(__gb_read(gb, gb->cpu_reg.hl.reg));
 		break;
 
 	case 0xA7: /* AND A */
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 1;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_AND_R8(gb->cpu_reg.a);
 		break;
 
 	case 0xA8: /* XOR B */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ gb->cpu_reg.bc.bytes.b;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(gb->cpu_reg.bc.bytes.b);
 		break;
 
 	case 0xA9: /* XOR C */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ gb->cpu_reg.bc.bytes.c;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(gb->cpu_reg.bc.bytes.c);
 		break;
 
 	case 0xAA: /* XOR D */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ gb->cpu_reg.de.bytes.d;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(gb->cpu_reg.de.bytes.d);
 		break;
 
 	case 0xAB: /* XOR E */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ gb->cpu_reg.de.bytes.e;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(gb->cpu_reg.de.bytes.e);
 		break;
 
 	case 0xAC: /* XOR H */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ gb->cpu_reg.hl.bytes.h;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(gb->cpu_reg.hl.bytes.h);
 		break;
 
 	case 0xAD: /* XOR L */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ gb->cpu_reg.hl.bytes.l;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(gb->cpu_reg.hl.bytes.l);
 		break;
 
 	case 0xAE: /* XOR (HL) */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ __gb_read(gb, gb->cpu_reg.hl.reg);
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(__gb_read(gb, gb->cpu_reg.hl.reg));
 		break;
 
 	case 0xAF: /* XOR A */
-		gb->cpu_reg.a = 0x00;
-		gb->cpu_reg.f_bits.z = 1;
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(gb->cpu_reg.a);
 		break;
 
 	case 0xB0: /* OR B */
-		gb->cpu_reg.a = gb->cpu_reg.a | gb->cpu_reg.bc.bytes.b;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_OR_R8(gb->cpu_reg.bc.bytes.b);
 		break;
 
 	case 0xB1: /* OR C */
-		gb->cpu_reg.a = gb->cpu_reg.a | gb->cpu_reg.bc.bytes.c;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_OR_R8(gb->cpu_reg.bc.bytes.c);
 		break;
 
 	case 0xB2: /* OR D */
-		gb->cpu_reg.a = gb->cpu_reg.a | gb->cpu_reg.de.bytes.d;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_OR_R8(gb->cpu_reg.de.bytes.d);
 		break;
 
 	case 0xB3: /* OR E */
-		gb->cpu_reg.a = gb->cpu_reg.a | gb->cpu_reg.de.bytes.e;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_OR_R8(gb->cpu_reg.de.bytes.e);
 		break;
 
 	case 0xB4: /* OR H */
-		gb->cpu_reg.a = gb->cpu_reg.a | gb->cpu_reg.hl.bytes.h;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_OR_R8(gb->cpu_reg.hl.bytes.h);
 		break;
 
 	case 0xB5: /* OR L */
-		gb->cpu_reg.a = gb->cpu_reg.a | gb->cpu_reg.hl.bytes.l;
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_OR_R8(gb->cpu_reg.hl.bytes.l);
 		break;
 
 	case 0xB6: /* OR (HL) */
-		gb->cpu_reg.a = gb->cpu_reg.a | __gb_read(gb, gb->cpu_reg.hl.reg);
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_OR_R8(__gb_read(gb, gb->cpu_reg.hl.reg));
 		break;
 
 	case 0xB7: /* OR A */
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_OR_R8(gb->cpu_reg.a);
 		break;
 
 	case 0xB8: /* CP B */
@@ -2784,11 +2693,8 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0xBE: /* CP (HL) */
-	{
-		uint8_t val = __gb_read(gb, gb->cpu_reg.hl.reg);
-		PGB_INSTR_CP_R8(val);
+		PGB_INSTR_CP_R8(__gb_read(gb, gb->cpu_reg.hl.reg));
 		break;
-	}
 
 	case 0xBF: /* CP A */
 		gb->cpu_reg.f_bits.z = 1;
@@ -3144,11 +3050,7 @@ void __gb_step_cpu(struct gb_s *gb)
 	}
 
 	case 0xEE: /* XOR imm */
-		gb->cpu_reg.a = gb->cpu_reg.a ^ __gb_read(gb, gb->cpu_reg.pc.reg++);
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_XOR_R8(__gb_read(gb, gb->cpu_reg.pc.reg++));
 		break;
 
 	case 0xEF: /* RST 0x0028 */
@@ -3189,11 +3091,7 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	case 0xF6: /* OR imm */
-		gb->cpu_reg.a = gb->cpu_reg.a | __gb_read(gb, gb->cpu_reg.pc.reg++);
-		gb->cpu_reg.f_bits.z = (gb->cpu_reg.a == 0x00);
-		gb->cpu_reg.f_bits.n = 0;
-		gb->cpu_reg.f_bits.h = 0;
-		gb->cpu_reg.f_bits.c = 0;
+		PGB_INSTR_OR_R8(__gb_read(gb, gb->cpu_reg.pc.reg++));
 		break;
 
 	case 0xF7: /* PUSH AF */
@@ -3507,8 +3405,8 @@ void gb_reset(struct gb_s *gb)
 	gb->enable_cart_ram = 0;
 	gb->cart_mode_select = 0;
 
-	/* Use values as though the bootrom was already executed. */
-	if(gb->gb_bios_read == NULL)
+	/* Use values as though the boot ROM was already executed. */
+	if(gb->gb_bootrom_read == NULL)
 	{
 		uint8_t hdr_chk;
 		hdr_chk = gb->gb_rom_read(gb, ROM_HEADER_CHECKSUM_LOC) != 0;
@@ -3527,7 +3425,7 @@ void gb_reset(struct gb_s *gb)
 		gb->hram_io[IO_DIV ] = 0xAB;
 		gb->hram_io[IO_LCDC] = 0x91;
 		gb->hram_io[IO_STAT] = 0x85;
-		gb->hram_io[IO_BR  ] = 0x01;
+		gb->hram_io[IO_BANK] = 0x01;
 
 		memset(gb->vram, 0x00, VRAM_SIZE);
 	}
@@ -3539,7 +3437,7 @@ void gb_reset(struct gb_s *gb)
 		gb->hram_io[IO_DIV ] = 0x00;
 		gb->hram_io[IO_LCDC] = 0x00;
 		gb->hram_io[IO_STAT] = 0x84;
-		gb->hram_io[IO_BR  ] = 0x00;
+		gb->hram_io[IO_BANK] = 0x00;
 	}
 
 	gb->counter.lcd_count = 0;
@@ -3620,7 +3518,7 @@ enum gb_init_error_e gb_init(struct gb_s *gb,
 	gb->gb_serial_tx = NULL;
 	gb->gb_serial_rx = NULL;
 
-	gb->gb_bios_read = NULL;
+	gb->gb_bootrom_read = NULL;
 
 	/* Check valid ROM using checksum value. */
 	{
@@ -3698,10 +3596,10 @@ void gb_init_lcd(struct gb_s *gb,
 }
 #endif
 
-void gb_set_bios(struct gb_s *gb,
-		 uint8_t (*gb_bios_read)(struct gb_s*, const uint_fast16_t))
+void gb_set_bootrom(struct gb_s *gb,
+		 uint8_t (*gb_bootrom_read)(struct gb_s*, const uint_fast16_t))
 {
-	gb->gb_bios_read = gb_bios_read;
+	gb->gb_bootrom_read = gb_bootrom_read;
 }
 
 /**
@@ -3877,12 +3775,12 @@ void gb_tick_rtc(struct gb_s *gb);
 void gb_set_rtc(struct gb_s *gb, const struct tm * const time);
 
 /**
- * Use BIOS on reset. gb_reset() must be called for this to take affect.
+ * Use boot ROM on reset. gb_reset() must be called for this to take affect.
  * \param gb 	An initialised emulator context. Must not be NULL.
- * \param gb_bios_read Function pointer to read BIOS binary.
+ * \param gb_bootrom_read Function pointer to read boot ROM binary.
  */
-void gb_set_bios(struct gb_s *gb,
-	uint8_t (*gb_bios_read)(struct gb_s*, const uint_fast16_t));
+void gb_set_bootrom(struct gb_s *gb,
+	uint8_t (*gb_bootrom_read)(struct gb_s*, const uint_fast16_t));
 
 /* Undefine CPU Flag helper functions. */
 #undef PEANUT_GB_CPUFLAG_MASK_CARRY
