@@ -16,6 +16,7 @@
 // Peanut-GB emulator settings
 #define ENABLE_LCD	1
 #define ENABLE_SOUND	1
+#define ENABLE_SDCARD	1
 #define PEANUT_GB_HIGH_LCD_ACCURACY 1
 #define PEANUT_GB_USE_BIOS 0
 
@@ -370,12 +371,14 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
 }
 #endif
 
+#if ENABLE_SDCARD
 void read_cart_ram_file(struct gb_s *gb) {
 	/* Load Save File. */
 	char filename[16];
 	uint_fast32_t save_size;
 	UINT bw;
 	
+	gb_get_rom_name(gb,filename);
 	save_size=gb_get_save_size(gb);
 	if(save_size>0) {
 		sd_card_t *pSD=sd_get_by_num(0);
@@ -385,7 +388,6 @@ void read_cart_ram_file(struct gb_s *gb) {
 			return;
 		}
 
-		gb_get_rom_name(gb,filename);
 		FIL fil;
 		fr=f_open(&fil,filename,FA_READ);
 		if (fr==FR_OK) {
@@ -400,6 +402,22 @@ void read_cart_ram_file(struct gb_s *gb) {
 		}
 		f_unmount(pSD->pcName);
 	}
+
+	/** Set the RTC of the game cartridge. Only used by games that support it.
+	 * You could potentially force the game to allow the player to
+     * reset the time by setting the RTC to invalid values.
+     *
+     * Using memset(&gb->cart_rtc, 0xFF, sizeof(gb->cart_rtc)) for
+     * example causes Pokemon Gold/Silver to say "TIME NOT SET",
+     * allowing the player to set the time without having some dumb
+     * password.
+     *
+     * The memset has to be done directly to gb->cart_rtc because
+     * gb_set_rtc() processes the input values, which may cause
+     * games to not detect invalid values.
+    */
+	memset(gb->cart_rtc, 0xFF, sizeof(gb->cart_rtc));
+
 	printf("read_cart_ram_file(%s) COMPLETE (%lu bytes)\n",filename,save_size);
 }
 
@@ -434,6 +452,7 @@ void write_cart_ram_file(struct gb_s *gb) {
 	}
 	printf("write_cart_ram_file(%s) COMPLETE (%lu bytes)\n",filename,save_size);
 }
+#endif
 
 int main(void)
 {
@@ -454,7 +473,7 @@ int main(void)
 	/* Initialise USB serial connection for debugging. */
 	stdio_init_all();
 	time_init();
-	sleep_ms(500);
+	// sleep_ms(5000);
 	putstdio("INIT: ");
 
 	/* Initialise GPIO pins. */
@@ -517,8 +536,10 @@ int main(void)
 		goto sleep;
 	}
 
+#if ENABLE_SDCARD
 	/* Load Save File. */
 	read_cart_ram_file(&gb);
+#endif
 
 	/* Update buttons state */
 	gb.direct.joypad_bits.up=gpio_get(GPIO_UP);
@@ -669,7 +690,9 @@ int main(void)
 			}
 #endif
 			if(!gb.direct.joypad_bits.start && prev_joypad_bits.start) {
+#if ENABLE_SDCARD				
 				write_cart_ram_file(&gb);
+#endif				
 				gb_reset(&gb);
 			}
 		}

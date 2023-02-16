@@ -46,7 +46,7 @@ typedef uint16_t palette_t[3][4];
  */
 void get_colour_palette(palette_t selected_palette,uint8_t table_entry,uint8_t shuffling_flags)
 {
-	printf("get_colour_palette: table_entry=0x%02X,shuffling_flags=0x%02X\n",
+	printf("I get_colour_palette(table_entry=0x%02X,shuffling_flags=0x%02X)\n",
 		table_entry,
 		shuffling_flags);
 	if(table_entry==0x00 && shuffling_flags==0x01)
@@ -472,9 +472,9 @@ void get_colour_palette(palette_t selected_palette,uint8_t table_entry,uint8_t s
 	if(table_entry==0x16 && shuffling_flags==0x00)
 	{
 		const palette_t palette = 	{
-			{ 0xFFFF, 0xA534, 0x528A, 0x0000 }, /* OBJ0 */
-			{ 0xFFFF, 0xA534, 0x528A, 0x0000 }, /* OBJ1 */
-			{ 0xFFFF, 0xA534, 0x528A, 0x0000 }  /* BG */
+			{ 0xB634, 0x8CCF, 0x63AA, 0x31C4 }, /* OBJ0 */
+			{ 0xB634, 0x8CCF, 0x63AA, 0x31C4 }, /* OBJ1 */
+			{ 0xB634, 0x8CCF, 0x63AA, 0x31C4 }  /* BG */
 		};
 		memcpy(selected_palette, palette, PALETTE_SIZE_IN_BYTES);
 		return;
@@ -563,24 +563,24 @@ void get_colour_palette(palette_t selected_palette,uint8_t table_entry,uint8_t s
 	{
 		/* Game Boy DMG palette (4 shades of green) */
 		const palette_t palette = 	{
-			{ 0x7C02, 0x5BC8, 0x3AC9, 0x2A07 }, /* OBJ0 */
-			{ 0x7C02, 0x5BC8, 0x3AC9, 0x2A07 }, /* OBJ1 */
-			{ 0x7C02, 0x5BC8, 0x3AC9, 0x2A07 }  /* BG */
+			{ 0xDFEA, 0xAE68, 0x74E6, 0x4388 }, /* OBJ0 */
+			{ 0xDFEA, 0xAE68, 0x74E6, 0x4388 }, /* OBJ1 */
+			{ 0xDFEA, 0xAE68, 0x74E6, 0x4388 }  /* BG */
 		};
 		memcpy(selected_palette, palette, PALETTE_SIZE_IN_BYTES);
 		return;
 	}
 	/* default palette */
-	printf("get_colour_palette: No palette found for table_entry=0x%02X shuffling_flags=0x%02X\n",
+	printf("E get_colour_palette: No palette found for table_entry=0x%02X shuffling_flags=0x%02X\n",
 		table_entry,
 		shuffling_flags);
+	/* Game Boy DMG palette (4 shades of green) */
 	const palette_t palette = 	{
-		{ 0xFFFF, 0xFC30, 0x91C7, 0x0000 }, /* OBJ0 */
-		{ 0xFFFF, 0xFC30, 0x91C7, 0x0000 }, /* OBJ1 */
-		{ 0xFFFF, 0x7FE6, 0x0318, 0x0000 }  /* BG */
+		{ 0xDFEA, 0xAE68, 0x74E6, 0x4388 }, /* OBJ0 */
+		{ 0xDFEA, 0xAE68, 0x74E6, 0x4388 }, /* OBJ1 */
+		{ 0xDFEA, 0xAE68, 0x74E6, 0x4388 }  /* BG */
 	};
 	memcpy(selected_palette, palette, PALETTE_SIZE_IN_BYTES);
-	return;
 }
 
 /**
@@ -600,6 +600,7 @@ void get_colour_palette(palette_t selected_palette,uint8_t table_entry,uint8_t s
 void auto_assign_palette(uint16_t palette[3][4], uint8_t game_checksum, const char *game_title)
 {
 	char disambiguation_character=game_title[3]; /* e.g. 'METROID' -> R */
+	printf("I auto_assign_palette(0x%02X,%s)\n", game_checksum,game_title);
 	switch(game_checksum)
 	{
 		case 0x00:
@@ -731,6 +732,12 @@ void auto_assign_palette(uint16_t palette[3][4], uint8_t game_checksum, const ch
 			get_colour_palette(palette,0x0F,0x05);
 			break;
 		}
+		case 0x2B:
+		{
+			/* Mega Man V (USA) */
+			get_colour_palette(palette,0x0F,0x05);
+			break;
+		}
 		case 0x34:
 		{
 			/* Game Boy Gallery (Japan) */
@@ -817,6 +824,12 @@ void auto_assign_palette(uint16_t palette[3][4], uint8_t game_checksum, const ch
 		{
 			/* Wave Race (USA, Europe) */
 			get_colour_palette(palette,0x0B,0x05);
+			break;
+		}
+		case 0x50:
+		{
+			/* Castlevania II - Belmont's Revenge (USA, Europe) */
+			get_colour_palette(palette,0x0C,0x05);
 			break;
 		}
 		case 0x52:
@@ -913,6 +926,7 @@ void auto_assign_palette(uint16_t palette[3][4], uint8_t game_checksum, const ch
 		}
 		case 0x6B:
 		{
+			/* Castlevania Adventure, The (USA) */
 			/* Donkey Kong Land III (USA, Europe) */
 			/* Donkey Kong Land III (USA, Europe) (Rev A) */
 			get_colour_palette(palette,0x0C,0x05);
@@ -1214,9 +1228,9 @@ void auto_assign_palette(uint16_t palette[3][4], uint8_t game_checksum, const ch
 		}
 		default:
 		{
-			printf("auto_assign_palette: No palette found for checksum 0x%02X.\n", game_checksum);
-			/* B + Left (Game Boy Pocket Palette, monochrome, 4 shades of white) */
-			get_colour_palette(palette,0x16,0x00);
+			printf("E auto_assign_palette: No palette found for checksum 0x%02X.\n", game_checksum);
+			/* Original Game Boy DMG color palette (monochrome 4-shades of green!) */
+ 			get_colour_palette(palette,0xFF,0xFF);
 			break;
 		}
 	}
@@ -1238,7 +1252,7 @@ void auto_assign_palette(uint16_t palette[3][4], uint8_t game_checksum, const ch
  */
 void manual_assign_palette(palette_t palette, uint8_t selection)
 {
-	printf("manual_assign_palette(%d)\n", selection);
+	printf("I manual_assign_palette(%d)\n", selection);
 	switch(selection)
 	{
 		case 0:
@@ -1267,7 +1281,7 @@ void manual_assign_palette(palette_t palette, uint8_t selection)
 		}
 		case 4:
 		{
-			/* B + Left (DMG Palette) */
+			/* B + Left Game Boy Pocket (monochrome 4-shades of white) */
 			get_colour_palette(palette,0x16,0x00);
 			break;
 		}
@@ -1315,21 +1329,15 @@ void manual_assign_palette(palette_t palette, uint8_t selection)
 		}
 	 	case 12:
  		{
-			/* Original Game Boy DMG color palette (monochrome 4-shades of green!) */
- 			const palette_t selected_palette =
- 			{
-	 			{ 0x9DE1, 0x8D61, 0x3306, 0x09C1 },		// OBJ0
- 				{ 0x9DE1, 0x8D61, 0x3306, 0x09C1 },		// OBJ1
- 				{ 0x9DE1, 0x8D61, 0x3306, 0x09C1 }		// BG
- 			};
- 			memcpy(palette, selected_palette, PALETTE_SIZE_IN_BYTES);
+			/* A + B Original Game Boy DMG color palette (monochrome 4-shades of green!) */
+ 			get_colour_palette(palette,0xFF,0xFF);
  			break;
 		}
 		default:
 		{
-			/* B + Left (Game Boy Pocket Palette, monochrome, 4 shades of white) */
-			get_colour_palette(palette,0x16,0x00);
-			break;
+			/* Original Game Boy DMG color palette (monochrome 4-shades of green!) */
+ 			get_colour_palette(palette,0xFF,0xFF);
+ 			break;
 		}
 	}
 }
