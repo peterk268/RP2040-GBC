@@ -23,6 +23,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include <string.h>
 
 #define SCREEN_SIZE_X 176u
 #define SCREEN_SIZE_Y 220u
@@ -141,3 +142,34 @@ void mk_ili9225_set_x(uint8_t x);
  * Exit and stop using LCD. Currently does nothing.
  */
 void mk_ili9225_exit(void);
+
+/**
+ * Fill a rectangle at the given location, size and color.
+ */
+void mk_ili9225_fill_rect(uint8_t x,uint8_t y,uint8_t w,uint8_t h,uint16_t color);
+
+/**
+ * Fill the entire screen with the specified RGB565 color
+ */
+void mk_ili9225_fill(uint16_t color);
+
+/**
+ * Set a specified pixel to the given color
+ */
+void mk_ili9225_pixel(uint8_t x,uint8_t y,uint16_t color);
+
+/**
+ * Copy the specified framebuffer at the given coordinates
+ */
+void mk_ili9225_blit(uint16_t *fbuf,uint8_t x,uint8_t y,uint8_t w,uint8_t h);
+
+/**
+ * Return an 8x8 framebuffer for the given letter and color / background color
+ */
+void mk_ili9225_get_letter(uint16_t *fbuf,char letter,uint16_t color,uint16_t bgcolor);
+
+/**
+ * Write text to the screen using the the coordinates as the upper-left corner of the text.
+ * All characters have dimensions of 8x8 pixels.
+ */
+void mk_ili9225_text(char *s,uint8_t x,uint8_t y,uint16_t color,uint16_t bgcolor);

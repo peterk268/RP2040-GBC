@@ -665,6 +665,17 @@ void auto_assign_palette(uint16_t palette[3][4], uint8_t game_checksum, const ch
 		}
 		case 0x16:
 		{
+			if(disambiguation_character=='M') {
+				/* CUSTOM */
+				/* Batman - The Animated Series (USA, Europe) */
+				get_colour_palette(palette,0x0D,0x05);
+				break;
+			} else {
+				/* Donkey Kong Land (Japan) */
+				get_colour_palette(palette,0x0C,0x05);
+				break;
+			}
+
 			/* Yakuman (Japan);; Yakuman (Japan) (Rev A) */
 			get_colour_palette(palette,0x12,0x00);
 			break;

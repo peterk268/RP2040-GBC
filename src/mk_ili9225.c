@@ -392,7 +392,7 @@ unsigned mk_ili9225_init(void)
 			{ MK_ILI9225_REG_LCD_AC_DRIVING_CTRL,	0x0100 },
 			/* Increment vertical and horizontal address.
 			 * Use vertical image. */
-			{ MK_ILI9225_REG_ENTRY_MODE,		0x1008 },
+			{ MK_ILI9225_REG_ENTRY_MODE,		0x1018 },
 			/* Turn off all display outputs. */
 			{ MK_ILI9225_REG_DISPLAY_CTRL,		0x0000 },
 			/* Set porches to 8 lines. */
@@ -557,4 +557,741 @@ void mk_ili9225_set_drive_freq(uint16_t f)
 
 void mk_ili9225_exit(void)
 {
+}
+
+void mk_ili9225_fill_rect(uint8_t x,uint8_t y,uint8_t w,uint8_t h,uint16_t color)
+{
+	set_register(MK_ILI9225_REG_ENTRY_MODE,0x1018);
+	set_register(MK_ILI9225_REG_HORI_WIN_ADDR1, y+h-1);			// y_max
+	set_register(MK_ILI9225_REG_HORI_WIN_ADDR2, y);				// y_min
+	set_register(MK_ILI9225_REG_VERT_WIN_ADDR1, 219-x);			// x_max
+	set_register(MK_ILI9225_REG_VERT_WIN_ADDR2, 219-(x+w-1));	// x_min
+	set_register(MK_ILI9225_REG_RAM_ADDR_SET1,y);
+	set_register(MK_ILI9225_REG_RAM_ADDR_SET2,219-x);
+	write_register(MK_ILI9225_REG_GRAM_RW);
+	mk_ili9225_set_rs(1);
+	mk_ili9225_set_cs(0);
+	for(uint16_t i=0;i<w*h;i++) {
+		mk_ili9225_spi_write16(&color,1);
+	}
+	mk_ili9225_set_cs(1);
+}
+
+void mk_ili9225_fill(uint16_t color)
+{
+	mk_ili9225_fill_rect(0,0,220,176,color);
+}
+
+void mk_ili9225_pixel(uint8_t x,uint8_t y,uint16_t color)
+{
+	set_register(MK_ILI9225_REG_RAM_ADDR_SET1,y);
+	set_register(MK_ILI9225_REG_RAM_ADDR_SET2,219-x);
+	set_register(MK_ILI9225_REG_GRAM_RW,color);
+}
+
+void mk_ili9225_blit(uint16_t *fbuf,uint8_t x,uint8_t y,uint8_t w,uint8_t h) {
+	set_register(MK_ILI9225_REG_ENTRY_MODE,0x1018);
+	set_register(MK_ILI9225_REG_HORI_WIN_ADDR1, y+h-1);			// y_max
+	set_register(MK_ILI9225_REG_HORI_WIN_ADDR2, y);				// y_min
+	set_register(MK_ILI9225_REG_VERT_WIN_ADDR1, 219-x);			// x_max
+	set_register(MK_ILI9225_REG_VERT_WIN_ADDR2, 219-(x+w-1));	// x_min
+	set_register(MK_ILI9225_REG_RAM_ADDR_SET1,y);
+	set_register(MK_ILI9225_REG_RAM_ADDR_SET2,219-x);
+	write_register(MK_ILI9225_REG_GRAM_RW);
+	mk_ili9225_set_rs(1);
+	mk_ili9225_set_cs(0);
+	mk_ili9225_spi_write16(fbuf,w*h);
+	mk_ili9225_set_cs(1);
+}
+
+void mk_ili9225_get_letter(uint16_t *fbuf,char l,uint16_t color,uint16_t bgcolor) {
+	uint8_t letter[8];
+	uint8_t row;
+	
+	switch(l)
+	{
+		case 'a':
+		case 'A':
+		{
+			const uint8_t letter_[8]={0b00111100,
+						              0b01100110,
+						              0b01100110,
+						              0b01111110,
+						              0b01100110,
+						              0b01100110,
+						              0b01100110,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case 'b':
+		case 'B':
+		{
+			const uint8_t letter_[8]={0b01111100,
+						              0b01100110,
+						              0b01100110,
+						              0b01111100,
+						              0b01100110,
+						              0b01100110,
+						              0b01111100,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'c':
+		case 'C':
+		{
+			const uint8_t letter_[8]={0b00011110,
+						              0b00110000,
+						              0b01100000,
+						              0b01100000,
+						              0b01100000,
+						              0b00110000,
+						              0b00011110,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'd':
+		case 'D':
+		{
+			const uint8_t letter_[8]={0b01111000,
+						              0b01101100,
+						              0b01100110,
+						              0b01100110,
+						              0b01100110,
+						              0b01101100,
+						              0b01111000,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'e':
+		case 'E':
+		{
+			const uint8_t letter_[8]={0b01111110,
+						              0b01100000,
+						              0b01100000,
+						              0b01111000,
+						              0b01100000,
+						              0b01100000,
+						              0b01111110,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'f':
+		case 'F':
+		{
+			const uint8_t letter_[8]={0b01111110,
+						              0b01100000,
+						              0b01100000,
+						              0b01111000,
+						              0b01100000,
+						              0b01100000,
+						              0b01100000,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'g':
+		case 'G':
+		{
+			const uint8_t letter_[8]={0b00111100,
+						              0b01100110,
+						              0b01100000,
+						              0b01101110,
+						              0b01100110,
+						              0b01100110,
+						              0b00111110,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'h':
+		case 'H':
+		{
+			const uint8_t letter_[8]={0b01100110,
+						              0b01100110,
+						              0b01100110,
+						              0b01111110,
+						              0b01100110,
+						              0b01100110,
+						              0b01100110,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'i':
+		case 'I':
+		{
+			const uint8_t letter_[8]={0b00111100,
+						              0b00011000,
+						              0b00011000,
+						              0b00011000,
+						              0b00011000,
+						              0b00011000,
+						              0b00111100,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'j':
+		case 'J':
+		{
+			const uint8_t letter_[8]={0b00000110,
+						              0b00000110,
+						              0b00000110,
+						              0b00000110,
+						              0b00000110,
+						              0b01100110,
+						              0b00111100,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'k':
+		case 'K':
+		{
+			const uint8_t letter_[8]={0b11000110,
+						              0b11001100,
+						              0b11011000,
+						              0b11110000,
+						              0b11011000,
+						              0b11001100,
+						              0b11000110,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'l':
+		case 'L':
+		{
+			const uint8_t letter_[8]={0b01100000,
+						              0b01100000,
+						              0b01100000,
+						              0b01100000,
+						              0b01100000,
+						              0b01100000,
+						              0b01111110,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'm':
+		case 'M':
+		{
+			const uint8_t letter_[8]={0b11000110,
+						              0b11101110,
+						              0b11111110,
+						              0b11010110,
+						              0b11000110,
+						              0b11000110,
+						              0b11000110,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'n':
+		case 'N':
+		{
+			const uint8_t letter_[8]={0b11000110,
+						              0b11100110,
+						              0b11110110,
+						              0b11011110,
+						              0b11001110,
+						              0b11000110,
+						              0b11000110,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'o':
+		case 'O':
+		{
+			const uint8_t letter_[8]={0b00111100,
+						              0b01100110,
+						              0b01100110,
+						              0b01100110,
+						              0b01100110,
+						              0b01100110,
+						              0b00111100,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'p':
+		case 'P':
+		{
+			const uint8_t letter_[8]={0b01111100,
+						              0b01100110,
+						              0b01100110,
+						              0b01111100,
+						              0b01100000,
+						              0b01100000,
+						              0b01100000,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'q':
+		case 'Q':
+		{
+			const uint8_t letter_[8]={0b01111000,
+						              0b11001100,
+						              0b11001100,
+						              0b11001100,
+						              0b11001100,
+						              0b11011100,
+						              0b01111110,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'r':
+		case 'R':
+		{
+			const uint8_t letter_[8]={0b01111100,
+						              0b01100110,
+						              0b01100110,
+						              0b01111100,
+						              0b01101100,
+						              0b01100110,
+						              0b01100110,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 's':
+		case 'S':
+		{
+			const uint8_t letter_[8]={0b00111100,
+						              0b01100110,
+						              0b01110000,
+						              0b00111100,
+						              0b00001110,
+						              0b01100110,
+						              0b00111100,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 't':
+		case 'T':
+		{
+			const uint8_t letter_[8]={0b01111110,
+						              0b00011000,
+						              0b00011000,
+						              0b00011000,
+						              0b00011000,
+						              0b00011000,
+						              0b00011000,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'u':
+		case 'U':
+		{
+			const uint8_t letter_[8]={0b01100110,
+						              0b01100110,
+						              0b01100110,
+						              0b01100110,
+						              0b01100110,
+						              0b01100110,
+						              0b00111100,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'v':
+		case 'V':
+		{
+			const uint8_t letter_[8]={0b01100110,
+						              0b01100110,
+						              0b01100110,
+						              0b01100110,
+						              0b00111100,
+						              0b00111100,
+						              0b00011000,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'w':
+		case 'W':
+		{
+			const uint8_t letter_[8]={0b11000110,
+						              0b11000110,
+						              0b11000110,
+						              0b11010110,
+						              0b11111110,
+						              0b11101110,
+						              0b11000110,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'x':
+		case 'X':
+		{
+			const uint8_t letter_[8]={0b11000011,
+						              0b01100110,
+						              0b00111100,
+						              0b00011000,
+						              0b00111100,
+						              0b01100110,
+						              0b11000011,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'y':
+		case 'Y':
+		{
+			const uint8_t letter_[8]={0b11000011,
+						              0b01100110,
+						              0b00111100,
+						              0b00011000,
+						              0b00011000,
+						              0b00011000,
+						              0b00011000,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case 'z':
+		case 'Z':
+		{
+			const uint8_t letter_[8]={0b11111110,
+						              0b00001100,
+						              0b00011000,
+						              0b00110000,
+						              0b01100000,
+						              0b11000000,
+						              0b11111110,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case '-':
+		{
+			const uint8_t letter_[8]={0b00000000,
+						              0b00000000,
+						              0b00000000,
+									  0b01111110,
+						              0b00000000,
+						              0b00000000,
+						              0b00000000,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case '(':
+		case '[':
+		case '{':
+		{
+			const uint8_t letter_[8]={0b00001100,
+						              0b00011000,
+						              0b00110000,
+									  0b00110000,
+						              0b00110000,
+						              0b00011000,
+						              0b00001100,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+        case ')':
+		case ']':
+		case '}':
+		{
+			const uint8_t letter_[8]={0b00110000,
+						              0b00011000,
+						              0b00001100,
+									  0b00001100,
+						              0b00001100,
+						              0b00011000,
+						              0b00110000,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case ',':
+		{
+			const uint8_t letter_[8]={0b00000000,
+						              0b00000000,
+						              0b00000000,
+									  0b00000000,
+						              0b00000000,
+						              0b00011000,
+						              0b00011000,
+						              0b00110000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case '.':
+		{
+			const uint8_t letter_[8]={0b00000000,
+						              0b00000000,
+						              0b00000000,
+									  0b00000000,
+						              0b00000000,
+						              0b00011000,
+						              0b00011000,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case '!':
+		{
+			const uint8_t letter_[8]={0b00011000,
+						              0b00011000,
+						              0b00011000,
+									  0b00011000,
+						              0b00011000,
+						              0b00000000,
+						              0b00011000,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case '&':
+		{
+			const uint8_t letter_[8]={0b00111000,
+						              0b01101100,
+						              0b01101000,
+									  0b01110110,
+						              0b11011100,
+						              0b11001110,
+						              0b01111011,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case '\'':
+		{
+			const uint8_t letter_[8]={0b00011000,
+						              0b00011000,
+						              0b00110000,
+									  0b00000000,
+						              0b00000000,
+						              0b00000000,
+						              0b00000000,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case '0':
+		{
+			const uint8_t letter_[8]={0b00111100,
+						              0b01100110,
+						              0b01101110,
+									  0b01111110,
+						              0b01110110,
+						              0b01100110,
+						              0b00111100,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case '1':
+		{
+			const uint8_t letter_[8]={0b00011000,
+						              0b00111000,
+						              0b01111000,
+									  0b00011000,
+						              0b00011000,
+						              0b00011000,
+						              0b00011000,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case '2':
+		{
+			const uint8_t letter_[8]={0b00111100,
+						              0b01100110,
+						              0b00000110,
+									  0b00001100,
+						              0b00011000,
+						              0b00110000,
+						              0b01111110,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case '3':
+		{
+			const uint8_t letter_[8]={0b00111100,
+						              0b01100110,
+						              0b00000110,
+									  0b00011100,
+						              0b00000110,
+						              0b01100110,
+						              0b00111100,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case '4':
+		{
+			const uint8_t letter_[8]={0b00011100,
+						              0b00111100,
+						              0b01101100,
+									  0b11001100,
+						              0b11111110,
+						              0b00001100,
+						              0b00001100,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case '5':
+		{
+			const uint8_t letter_[8]={0b01111110,
+						              0b01100000,
+						              0b01111100,
+									  0b00000110,
+						              0b00000110,
+						              0b01100110,
+						              0b00111100,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case '6':
+		{
+			const uint8_t letter_[8]={0b00011100,
+						              0b00110000,
+						              0b01100000,
+									  0b01111100,
+						              0b01100110,
+						              0b01100110,
+						              0b00111100,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case '7':
+		{
+			const uint8_t letter_[8]={0b01111110,
+						              0b00000110,
+						              0b00000110,
+									  0b00001100,
+						              0b00011000,
+						              0b00011000,
+						              0b00011000,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case '8':
+		{
+			const uint8_t letter_[8]={0b00111100,
+						              0b01100110,
+						              0b01100110,
+									  0b00111100,
+						              0b01100110,
+						              0b01100110,
+						              0b00111100,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		case '9':
+		{
+			const uint8_t letter_[8]={0b00111100,
+						              0b01100110,
+						              0b01100110,
+									  0b00111110,
+						              0b00000110,
+						              0b00001100,
+						              0b00111000,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+
+		default:
+		{
+			const uint8_t letter_[8]={0b00000000,
+						              0b00000000,
+						              0b00000000,
+						              0b00000000,
+						              0b00000000,
+						              0b00000000,
+						              0b00000000,
+						              0b00000000};
+			memcpy(letter,letter_,8);
+			break;
+		}
+	}
+
+	for(uint8_t y=0;y<8;y++) {
+		row=letter[y];
+		for(uint8_t x=0;x<8;x++) {
+			if(row & 128) {
+				fbuf[y*8+x]=color;
+			} else {
+				fbuf[y*8+x]=bgcolor;
+			}
+			row=row<<1;
+		}
+	}
+}
+
+void mk_ili9225_text(char *s,uint8_t x,uint8_t y,uint16_t color,uint16_t bgcolor) {
+	uint16_t fbuf[8*8];
+	for(uint8_t i=0;i<strlen(s);i++) {
+		mk_ili9225_get_letter(fbuf,s[i],color,bgcolor);
+		mk_ili9225_blit(fbuf,x,y,8,8);
+		x+=8;
+		if(x>27*8) {
+			break;
+		}
+	}
 }

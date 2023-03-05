@@ -12,7 +12,6 @@ add_subdirectory(ext/FatFs_SPI build)
 
 add_executable(RP2040_GB
         src/main.c
-        src/rom.c
         src/mk_ili9225.c
         ext/minigb_apu/minigb_apu.c
         ext/i2s/i2s.c
