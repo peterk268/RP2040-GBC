@@ -1,23 +1,34 @@
 # RP2040-GB for Pico-GB
 
-This is a fork of the [RP2040-GB Game Boy (DMG) emulator from deltabeard](https://github.com/deltabeard/RP2040-GB). 
+This is a fork of the [RP2040-GB Game Boy (DMG) emulator from deltabeard](https://github.com/deltabeard/RP2040-GB). RP2040-GB is a Game Boy (DMG) emulator Peanut-GB on the Raspberry Pi RP2040 microcontroller, using an ILI9225 screen. Runs at more than 70 fps without audio emulation. With frame skip and interlacing, can run at up to 120 fps.
 
-This fork includes all changes needed for the emulator to run on the [Pico-GB emulation console](https://www.youmaketech.com/pico-gb-raspberry-pi-pico-gameboy-emulation-console/). The Pico-GB is a 3d-printed retro-gaming emulation console that ressembles to the original Nintendo Game Boy released in 1989. 
+This fork includes changes done by me for [Pico-GB](https://www.youmaketech.com/pico-gb-gameboy-emulator-handheld-for-raspberry-pi-pico/):
+* push buttons support
+* overclocking to 266MHz for more accurate framerate (~60 FPS)
+* I2S sound support (44.1kHz 16 bits stereo audio)
+* SD card support (store roms and save games) + game selection menu
+* automatic color palette selection for some games (emulation of Game Boy Color Bootstrap ROM) + manual color palette selection
 
-RP2040-GB is a Game Boy (DMG) emulator [Peanut-GB](https://github.com/deltabeard/Peanut-GB) on the Raspberry Pi RP2040 microcontroller, using an ILI9225 screen.
-Runs at more than 70 fps without audio emulation. With frame skip and interlacing, can run at up to 120 fps.
+Pico-GB is a [3d-printed Game Boy emulator handheld gaming console for Raspberry Pi Pico](https://www.youmaketech.com/pico-gb-gameboy-emulator-handheld-for-raspberry-pi-pico/) that ressembles to the original Nintendo Game Boy released in 1989.
 
-# What you need
-* Raspberry Pi Pico (1x)
-* 2.2inch ILI9225 176×220 LCD Display Module (1x)
-* MAX98357A amplifier (1x)
-* 2W 8ohms speaker (1x)
-* Micro Push Button Switch, Momentary Tactile Tact Touch, 6x6x6 mm, 4 pins (8x)
-* Solderable Breadboard (1x)
-* Dupont Wires Assorted Kit (Male to Female + Male to Male + Female to Female)
-* Preformed Breadboard Jumper Wires
+# Hardware
+## What you need
+* (1x) [Raspberry Pi Pico](https://amzn.to/3rAcmDy)
+* (1x) [2.2inch ILI9225 176×220 LCD Display Module](https://amzn.to/3aNAMD7)
+* (1x) [FAT 32 formatted Micro SD card + adapter](https://amzn.to/3ICKzcm) with roms you legally own. Roms must have the .gb extension and must be copied to the root folder.
+* (1x) [MAX98357A amplifier](https://www.youmaketech.com/max98357)
+* (1x) [2W 8ohms speaker](https://amzn.to/3ikDy6S)
+* (8x) [Micro Push Button Switch, Momentary Tactile Tact Touch, 6x6x6 mm, 4 pins](https://amzn.to/3dyXBsx)
+* (1x) [Solderable Breadboard](https://amzn.to/3lwvfDi)
+* [Dupont Wires Assorted Kit (Male to Female + Male to Male + Female to Female)](https://amzn.to/3HtbvdO)
+* [Preformed Breadboard Jumper Wires](https://amzn.to/3rxwVjM)
 
-# Raspberry Pi Pico Pins Assignment
+DISCLAIMER: Some links are affiliate links. As an Amazon Associate I receive a small commission (at no extra cost to you) if you make a purchase after clicking one of the affiliate links. Thanks for your support!
+
+## Setting up the hardware
+[Pico-GB assembly instructions, circuit diagrams, 3d printed files etc.](https://www.youmaketech.com/pico-gb-gameboy-emulator-handheld-for-raspberry-pi-pico/)
+
+# Pinout
 * UP = GP2
 * DOWN = GP3
 * LEFT = GP4
@@ -26,6 +37,10 @@ Runs at more than 70 fps without audio emulation. With frame skip and interlacin
 * BUTTON B = GP7
 * SELECT = GP8
 * START = GP9
+* SD MISO = GP12
+* SD CS = GP13
+* SD CSK = GP14
+* SD MOSI = GP15
 * LCD CS = GP17
 * LCD CLK = GP18
 * LCD SDI = GP19
@@ -36,47 +51,28 @@ Runs at more than 70 fps without audio emulation. With frame skip and interlacin
 * MAX98357A BCLK = GP27
 * MAX98357A LRC = GP28
 
-# Installing
+# Flashing the firmware
+* Download RP2040_GB.uf2 from the [releases page](https://github.com/YouMakeTech/Pico-GB/releases)
+* Push and hold the BOOTSEL button on the Pico, then connect to your computer using a micro USB cable. Release BOOTSEL once the drive RPI-RP2 appears on your computer.
+* Drag and drop the UF2 file on to the RPI-RP2 drive. The Raspberry Pi Pico will reboot and will now run the emulator.
 
-Start by plugging a micro USB cable into the micro USB port on your Pico. Hold down the BOOTSEL button on the top of your Pico; while still holding it down, connect the other end of the micro USB cable to one of the USB ports on your Raspberry Pi or other computer.
+# Preparing the SD card
+The SD card is used to store game roms and save game progress. For this project, you will need a FAT 32 formatted Micro SD card with roms you legally own. Roms must have the .gb extension.
 
-After a few seconds, you should see your Pico appear as a removable drive. Copy the RP2040_GB.uf2 file from the build directory to your Pico. You can find an example .uf2 file in the releases with the open source game ["Libbet and the Magic Floor" from Damian Yerrick](https://github.com/pinobatch/libbet). 
+* Insert your SD card in a Windows computer and format it as FAT 32
+* Copy your .gb files to the SD card root folder (subfolders are not supported at this time)
+* Insert the SD card into the ILI9225 SD card slot using a Micro SD adapter
 
-Unplug the USB cable from your Pico now and plug it back. After a few seconds, the game should start.
-
-# Building
-
+# Building from source
 The [Raspberry Pi Pico SDK](https://github.com/raspberrypi/pico-sdk) is required to build this project. Make sure you are able to compile an [example project](https://github.com/raspberrypi/pico-examples#first--examples) before continuing.
 
-The file `./src/rom.c` is required for this project to compile. This contains the ROM data that will be played by Peanut-GB on the RP2040. To generate this file, the program `xxd` is required. `xxd` is a tool that can convert binary files to a valid C header file, and is packaged with [Vim](https://www.vim.org/) and [NeoVim](https://neovim.io/), prepackaged within the [w64devkit](https://github.com/skeeto/w64devkit) development environment, or can be compiled from source [from the vim repository](https://github.com/vim/vim/tree/master/src/xxd).
+# Known iusses and limitations
+* No copyrighted games are included with Pico-GB / RP2040-GB. For this project, you will need a FAT 32 formatted Micro SD card with roms you legally own. Roms must have the .gb extension.
+* The RP2040-GB emulator is able to run at full speed on the Pico, at the expense of emulation accuracy. Some games may not work as expected or may not work at all. RP2040-GB is still experimental and not all features are guaranteed to work.
+* RP2040-GB is only compatible with original Game Boy DMG games (not compatible with Game Boy Color or Game Boy Advance games)
+* Repeatedly flashing your Pico will eventually wear out the flash memory (Pico is qualified for min. 100K flash/erase cycles)
+* The emulator overclocks the Pico in order to get the emulator working fast enough. Overclocking can reduce the Pico’s lifespan.
+* Use this software and instructions at your own risk! I will not be responsible in any way for any damage to your Pico and/or connected peripherals caused by using this software. I also do not take responsibility in any way when damage is caused to the Pico or display due to incorrect wiring or voltages.
 
-Steps:
-1. Convert your `*.gb` or `*.gbc`† file to a C header file by executing the following command in a terminal or command prompt:
-```sh
-xxd -i rom.gb rom.c
-```
-
-† *Note that Game Boy Color (GBC) games are not supported with Peanut-GB or RP2040-GB. On load, games that require a GBC hardware will typically display an error message as they will be forced to boot into DMG mode.*
-
-2. Open the `rom.c` file in a text editor, and replace the first line with:
-```
-#include <pico/platform.h>
-const unsigned char __in_flash("rom") rom[] = {
-```
-Since RP2040-GB is configured to run from internal RAM for performance, the `__in_flash` attribute stops the ROM data from also being copied to the RAM because most ROMs are larger than the available RAM on the RP2040. We also additionally define `const` as this is read-only data.
-
-3. Copy this `rom.c` file to the `src` folder.
-
-The project should now compile with your ROM builtin.
-
-Depending on the license of the ROM that you have built into this project, the output RP2040 binary may not be redistributable under the terms of your local copyright law.
-
-## Future work
-
-Further work is required to improve Peanut-GB for this microcontroller environment. This includes:
-
-- Using an APU that is optimised for space and speed. No, or very few, floating point operations.
-
-## License
-
+# License
 MIT
