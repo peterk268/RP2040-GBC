@@ -66,7 +66,7 @@ The SD card is used to store game roms and save game progress. For this project,
 # Building from source
 The [Raspberry Pi Pico SDK](https://github.com/raspberrypi/pico-sdk) is required to build this project. Make sure you are able to compile an [example project](https://github.com/raspberrypi/pico-examples#first--examples) before continuing.
 
-# Known iusses and limitations
+# Known issues and limitations
 * No copyrighted games are included with Pico-GB / RP2040-GB. For this project, you will need a FAT 32 formatted Micro SD card with roms you legally own. Roms must have the .gb extension.
 * The RP2040-GB emulator is able to run at full speed on the Pico, at the expense of emulation accuracy. Some games may not work as expected or may not work at all. RP2040-GB is still experimental and not all features are guaranteed to work.
 * RP2040-GB is only compatible with original Game Boy DMG games (not compatible with Game Boy Color or Game Boy Advance games)
