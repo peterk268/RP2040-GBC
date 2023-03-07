@@ -691,8 +691,10 @@ while(true)
 
 		frames++;
 #if ENABLE_SOUND
-		audio_callback(NULL, stream, AUDIO_BUFFER_SIZE_BYTES);
-		i2s_dma_write(&i2s_config, stream);
+		if(!gb.direct.frame_skip) {
+			audio_callback(NULL, stream, AUDIO_BUFFER_SIZE_BYTES);
+			i2s_dma_write(&i2s_config, stream);
+		}
 #endif
 
 		/* Update buttons state */
@@ -717,33 +719,39 @@ while(true)
 		if(!gb.direct.joypad_bits.select) {
 #if ENABLE_SOUND
 			if(!gb.direct.joypad_bits.up && prev_joypad_bits.up) {
-				/* select + up */
+				/* select + up: increase sound volume */
 				i2s_increase_volume(&i2s_config);
 			}
 			if(!gb.direct.joypad_bits.down && prev_joypad_bits.down) {
-				/* select + down */
+				/* select + down: decrease sound volume */
 				i2s_decrease_volume(&i2s_config);
 			}
 #endif
 			if(!gb.direct.joypad_bits.right && prev_joypad_bits.right) {
-				/* select + right */
+				/* select + right: select the next manual color palette */
 				if(manual_palette_selected<12) {
 					manual_palette_selected++;
 					manual_assign_palette(palette,manual_palette_selected);
 				}	
 			}
 			if(!gb.direct.joypad_bits.left && prev_joypad_bits.left) {
-				/* select + left */
+				/* select + left: select the previous manual color palette */
 				if(manual_palette_selected>0) {
 					manual_palette_selected--;
 					manual_assign_palette(palette,manual_palette_selected);
 				}
 			}
 			if(!gb.direct.joypad_bits.start && prev_joypad_bits.start) {
+				/* select + start: save ram and resets to the game selection menu */
 #if ENABLE_SDCARD				
 				write_cart_ram_file(&gb);
 #endif				
 				goto out;
+			}
+			if(!gb.direct.joypad_bits.a && prev_joypad_bits.a) {
+				/* select + A: enable/disable frame-skip => fast-forward */
+				gb.direct.frame_skip=!gb.direct.frame_skip;
+				printf("I gb.direct.frame_skip = %d\n",gb.direct.frame_skip);
 			}
 		}
 
