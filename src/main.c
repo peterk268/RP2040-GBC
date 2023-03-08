@@ -313,7 +313,7 @@ void read_cart_ram_file(struct gb_s *gb) {
 		sd_card_t *pSD=sd_get_by_num(0);
 		FRESULT fr=f_mount(&pSD->fatfs,pSD->pcName,1);
 		if (FR_OK!=fr) {
-			printf("f_mount error: %s (%d)\n",FRESULT_str(fr),fr);
+			printf("E f_mount error: %s (%d)\n",FRESULT_str(fr),fr);
 			return;
 		}
 
@@ -322,16 +322,16 @@ void read_cart_ram_file(struct gb_s *gb) {
 		if (fr==FR_OK) {
 			f_read(&fil,ram,f_size(&fil),&br);
 		} else {
-			printf("f_open(%s) error: %s (%d)\n",filename,FRESULT_str(fr),fr);
+			printf("E f_open(%s) error: %s (%d)\n",filename,FRESULT_str(fr),fr);
 		}
 		
 		fr=f_close(&fil);
 		if(fr!=FR_OK) {
-			printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
+			printf("E f_close error: %s (%d)\n", FRESULT_str(fr), fr);
 		}
 		f_unmount(pSD->pcName);
 	}
-	printf("read_cart_ram_file(%s) COMPLETE (%lu bytes)\n",filename,save_size);
+	printf("I read_cart_ram_file(%s) COMPLETE (%lu bytes)\n",filename,save_size);
 }
 
 /**
@@ -348,7 +348,7 @@ void write_cart_ram_file(struct gb_s *gb) {
 		sd_card_t *pSD=sd_get_by_num(0);
 		FRESULT fr=f_mount(&pSD->fatfs,pSD->pcName,1);
 		if (FR_OK!=fr) {
-			printf("f_mount error: %s (%d)\n",FRESULT_str(fr),fr);
+			printf("E f_mount error: %s (%d)\n",FRESULT_str(fr),fr);
 			return;
 		}
 
@@ -357,16 +357,16 @@ void write_cart_ram_file(struct gb_s *gb) {
 		if (fr==FR_OK) {
 			f_write(&fil,ram,save_size,&bw);
 		} else {
-			printf("f_open(%s) error: %s (%d)\n",filename,FRESULT_str(fr),fr);
+			printf("E f_open(%s) error: %s (%d)\n",filename,FRESULT_str(fr),fr);
 		}
 		
 		fr=f_close(&fil);
 		if(fr!=FR_OK) {
-			printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
+			printf("E f_close error: %s (%d)\n", FRESULT_str(fr), fr);
 		}
 		f_unmount(pSD->pcName);
 	}
-	printf("write_cart_ram_file(%s) COMPLETE (%lu bytes)\n",filename,save_size);
+	printf("I write_cart_ram_file(%s) COMPLETE (%lu bytes)\n",filename,save_size);
 }
 
 /**
@@ -375,10 +375,11 @@ void write_cart_ram_file(struct gb_s *gb) {
 void load_cart_rom_file(char *filename) {
 	UINT br;
 	uint8_t buffer[FLASH_SECTOR_SIZE];
+	bool mismatch=false;
 	sd_card_t *pSD=sd_get_by_num(0);
 	FRESULT fr=f_mount(&pSD->fatfs,pSD->pcName,1);
 	if (FR_OK!=fr) {
-		printf("f_mount error: %s (%d)\n",FRESULT_str(fr),fr);
+		printf("E f_mount error: %s (%d)\n",FRESULT_str(fr),fr);
 		return;
 	}
 	FIL fil;
@@ -389,23 +390,38 @@ void load_cart_rom_file(char *filename) {
 			f_read(&fil,buffer,sizeof buffer,&br);
 			if(br==0) break; /* end of file */
 
-			printf("\nErasing target region...\n");
+			printf("I Erasing target region...\n");
 			flash_range_erase(flash_target_offset,FLASH_SECTOR_SIZE);
-			printf("\nProgramming target region...\n");
+			printf("I Programming target region...\n");
 			flash_range_program(flash_target_offset,buffer,FLASH_SECTOR_SIZE);
+			
+			/* Read back target region and check programming */
+			printf("I Done. Reading back target region...\n");
+			for(uint32_t i=0;i<FLASH_SECTOR_SIZE;i++) {
+				if(rom[flash_target_offset+i]!=buffer[i]) {
+					mismatch=true;
+				}
+			}
+
+			/* Next sector */
 			flash_target_offset+=FLASH_SECTOR_SIZE;
 		}
+		if(mismatch) {
+	        printf("I Programming successful!\n");
+		} else {
+			printf("E Programming failed!\n");
+		}
 	} else {
-		printf("f_open(%s) error: %s (%d)\n",filename,FRESULT_str(fr),fr);
+		printf("E f_open(%s) error: %s (%d)\n",filename,FRESULT_str(fr),fr);
 	}
 	
 	fr=f_close(&fil);
 	if(fr!=FR_OK) {
-		printf("f_close error: %s (%d)\n", FRESULT_str(fr), fr);
+		printf("E f_close error: %s (%d)\n", FRESULT_str(fr), fr);
 	}
 	f_unmount(pSD->pcName);
 
-	printf("load_cart_rom_file(%s) COMPLETE (%lu bytes)\n",filename,br);
+	printf("I load_cart_rom_file(%s) COMPLETE (%lu bytes)\n",filename,br);
 }
 
 /**
@@ -419,7 +435,7 @@ uint16_t rom_file_selector_display_page(char filename[22][256],uint16_t num_page
 
     fr=f_mount(&pSD->fatfs,pSD->pcName,1);
     if (FR_OK!=fr) {
-        printf("f_mount error: %s (%d)\n",FRESULT_str(fr),fr);
+        printf("E f_mount error: %s (%d)\n",FRESULT_str(fr),fr);
         return 0;
     }
 
@@ -649,11 +665,6 @@ while(true)
 		goto out;
 	}
 
-#if ENABLE_SDCARD
-	/* Load Save File. */
-	read_cart_ram_file(&gb);
-#endif
-
 	/* Automatically assign a colour palette to the game */
 	char rom_title[16];
 	auto_assign_palette(palette, gb_colour_hash(&gb),gb_get_rom_name(&gb,rom_title));
@@ -673,6 +684,11 @@ while(true)
 	audio_init();
 	
 	putstdio("AUDIO ");
+#endif
+
+#if ENABLE_SDCARD
+	/* Load Save File. */
+	read_cart_ram_file(&gb);
 #endif
 
 	putstdio("\n> ");
