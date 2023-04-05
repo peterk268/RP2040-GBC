@@ -173,11 +173,16 @@
 #define LCDC_OBJ_ENABLE     0x02
 #define LCDC_BG_ENABLE      0x01
 
-/* LCD characteristics */
-#define LCD_LINE_CYCLES     (456 + 4)
+/** LCD characteristics **/
+/* PPU cycles through modes every 456 cycles. */
+#define LCD_LINE_CYCLES     456
+/* Mode 0 starts on cycle 0. */
 #define LCD_MODE_0_CYCLES   0
+/* Mode 2 starts on cycle 204. */
 #define LCD_MODE_2_CYCLES   204
+/* Mode 3 starts on cycle 284. */
 #define LCD_MODE_3_CYCLES   284
+/* There are 154 scanlines. LY < 154. */
 #define LCD_VERT_LINES      154
 #define LCD_WIDTH           160
 #define LCD_HEIGHT          144
@@ -787,7 +792,7 @@ uint8_t __gb_read(struct gb_s *gb, const uint16_t addr)
 
 	/* Return address that caused read error. */
 	(gb->gb_error)(gb, GB_INVALID_READ, addr);
-	PGB_UNREACHABLE();
+	// PGB_UNREACHABLE();
 }
 
 /**
@@ -1653,47 +1658,49 @@ void __gb_step_cpu(struct gb_s *gb)
 	/* If gb_halt is positive, then an interrupt must have occured by the
 	 * time we reach here, becuase on HALT, we jump to the next interrupt
 	 * immediately. */
-	if(gb->gb_halt || (gb->gb_ime &&
+	while(gb->gb_halt || (gb->gb_ime &&
 			gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & ANY_INTR))
 	{
 		gb->gb_halt = 0;
 
-		if(gb->gb_ime)
+		if(!gb->gb_ime)
+			break;
+
+		/* Disable interrupts */
+		gb->gb_ime = 0;
+
+		/* Push Program Counter */
+		__gb_write(gb, --gb->cpu_reg.sp.reg, gb->cpu_reg.pc.bytes.p);
+		__gb_write(gb, --gb->cpu_reg.sp.reg, gb->cpu_reg.pc.bytes.c);
+
+		/* Call interrupt handler if required. */
+		if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & VBLANK_INTR)
 		{
-			/* Disable interrupts */
-			gb->gb_ime = 0;
-
-			/* Push Program Counter */
-			__gb_write(gb, --gb->cpu_reg.sp.reg, gb->cpu_reg.pc.bytes.p);
-			__gb_write(gb, --gb->cpu_reg.sp.reg, gb->cpu_reg.pc.bytes.c);
-
-			/* Call interrupt handler if required. */
-			if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & VBLANK_INTR)
-			{
-				gb->cpu_reg.pc.reg = VBLANK_INTR_ADDR;
-				gb->hram_io[IO_IF] ^= VBLANK_INTR;
-			}
-			else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & LCDC_INTR)
-			{
-				gb->cpu_reg.pc.reg = LCDC_INTR_ADDR;
-				gb->hram_io[IO_IF] ^= LCDC_INTR;
-			}
-			else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & TIMER_INTR)
-			{
-				gb->cpu_reg.pc.reg = TIMER_INTR_ADDR;
-				gb->hram_io[IO_IF] ^= TIMER_INTR;
-			}
-			else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & SERIAL_INTR)
-			{
-				gb->cpu_reg.pc.reg = SERIAL_INTR_ADDR;
-				gb->hram_io[IO_IF] ^= SERIAL_INTR;
-			}
-			else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & CONTROL_INTR)
-			{
-				gb->cpu_reg.pc.reg = CONTROL_INTR_ADDR;
-				gb->hram_io[IO_IF] ^= CONTROL_INTR;
-			}
+			gb->cpu_reg.pc.reg = VBLANK_INTR_ADDR;
+			gb->hram_io[IO_IF] ^= VBLANK_INTR;
 		}
+		else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & LCDC_INTR)
+		{
+			gb->cpu_reg.pc.reg = LCDC_INTR_ADDR;
+			gb->hram_io[IO_IF] ^= LCDC_INTR;
+		}
+		else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & TIMER_INTR)
+		{
+			gb->cpu_reg.pc.reg = TIMER_INTR_ADDR;
+			gb->hram_io[IO_IF] ^= TIMER_INTR;
+		}
+		else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & SERIAL_INTR)
+		{
+			gb->cpu_reg.pc.reg = SERIAL_INTR_ADDR;
+			gb->hram_io[IO_IF] ^= SERIAL_INTR;
+		}
+		else if(gb->hram_io[IO_IF] & gb->hram_io[IO_IE] & CONTROL_INTR)
+		{
+			gb->cpu_reg.pc.reg = CONTROL_INTR_ADDR;
+			gb->hram_io[IO_IF] ^= CONTROL_INTR;
+		}
+
+		break;
 	}
 
 	/* Obtain opcode */
@@ -2348,7 +2355,7 @@ void __gb_step_cpu(struct gb_s *gb)
 			/* This may be intentional, but this is required to stop an infinite
 			 * loop. */
 			(gb->gb_error)(gb, GB_HALT_FOREVER, gb->cpu_reg.pc.reg - 1);
-			PGB_UNREACHABLE();
+			// PGB_UNREACHABLE();
 		}
 
 		if(gb->hram_io[IO_SC] & SERIAL_SC_TX_START)
@@ -3146,16 +3153,15 @@ void __gb_step_cpu(struct gb_s *gb)
 		break;
 
 	default:
-		/* Return address where invlid opcode that was read. */
+		/* Return address where invalid opcode that was read. */
 		(gb->gb_error)(gb, GB_INVALID_OPCODE, gb->cpu_reg.pc.reg - 1);
-		PGB_UNREACHABLE();
+		// PGB_UNREACHABLE();
 	}
 
 	do
 	{
 		/* DIV register timing */
 		gb->counter.div_count += inst_cycles;
-
 		while(gb->counter.div_count >= DIV_CYCLES)
 		{
 			gb->hram_io[IO_DIV]++;
@@ -3246,6 +3252,9 @@ void __gb_step_cpu(struct gb_s *gb)
 		{
 			gb->counter.lcd_count -= LCD_LINE_CYCLES;
 
+			/* Next line */
+			gb->hram_io[IO_LY] = (gb->hram_io[IO_LY] + 1) % LCD_VERT_LINES;
+
 			/* LYC Update */
 			if(gb->hram_io[IO_LY] == gb->hram_io[IO_LYC])
 			{
@@ -3256,9 +3265,6 @@ void __gb_step_cpu(struct gb_s *gb)
 			}
 			else
 				gb->hram_io[IO_STAT] &= 0xFB;
-
-			/* Next line */
-			gb->hram_io[IO_LY] = (gb->hram_io[IO_LY] + 1) % LCD_VERT_LINES;
 
 			/* VBLANK Start */
 			if(gb->hram_io[IO_LY] == LCD_HEIGHT)
