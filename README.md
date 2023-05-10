@@ -12,7 +12,8 @@ This fork includes changes done by me for [Pico-GB](https://www.youmaketech.com/
 Pico-GB is a [3d-printed Game Boy emulator handheld gaming console for Raspberry Pi Pico](https://www.youmaketech.com/pico-gb-gameboy-emulator-handheld-for-raspberry-pi-pico/) that ressembles to the original Nintendo Game Boy released in 1989.
 
 # Videos
-[Let's build a Game Boy Emulator on a Breadboard!](https://youtu.be/ThmwXpIsGWs)
+* [Let's build a Game Boy Emulator on a Breadboard!](https://youtu.be/ThmwXpIsGWs)
+* [Build the ULTIMATE GameBoy Emulator for Raspberry Pi Pico](https://youtu.be/yauNQSS6nC4)
 
 # Hardware
 ## What you need
