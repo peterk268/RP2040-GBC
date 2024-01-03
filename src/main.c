@@ -35,6 +35,9 @@
 #define SCREEN_REFRESH_CYCLES_REDUCED (SCREEN_REFRESH_CYCLES/VSYNC_REDUCTION_FACTOR)
 #define DMG_CLOCK_FREQ_REDUCED (DMG_CLOCK_FREQ/VSYNC_REDUCTION_FACTOR)
 
+/* Improvments defined in improvements.c */
+#define USE_IMPROVEMENTS 1
+
 /* C Headers */
 #include <stdio.h>
 #include <stdlib.h>
@@ -93,11 +96,11 @@ uint16_t *stream;
 #endif
 
 /** Definition of ROM data
- * We're going to erase and reprogram a region 1Mb from the start of the flash
- * Once done, we can access this at XIP_BASE + 1Mb.
- * Game Boy DMG ROM size ranges from 32768 bytes (e.g. Tetris) to 1,048,576 bytes (e.g. Pokemod Red)
+ * We're going to erase and reprogram a region 2Mb from the start of the flash
+ * Once done, we can access this at XIP_BASE + 2Mb.
+ * Game Boy DMG ROM size ranges from 32768 bytes (e.g. Tetris) to 2,097,152 bytes (e.g. Pokemod Silver)
  */
-#define FLASH_TARGET_OFFSET (1024 * 1024)
+#define FLASH_TARGET_OFFSET (2 * 1024 * 1024)
 const uint8_t *rom = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET);
 static unsigned char rom_bank0[65536];
 
@@ -141,6 +144,18 @@ union core_cmd {
 static uint8_t pixels_buffer[LCD_WIDTH];
 
 #define putstdio(x) write(1, x, strlen(x))
+
+/* Improvement Section */
+#if USE_IMPROVEMENTS
+void check_select_bootsel() {
+    // If the Select button is pressed during power-on, we should go into bootloader mode.
+    if !gpio_get(GPIO_SELECT) {
+        let gpio_activity_pin_mask = 0;
+        let disable_interface_mask = 0;
+        rp2040_hal::rom_data::reset_to_usb_boot(gpio_activity_pin_mask, disable_interface_mask);
+    }
+}
+#endif
 
 /* Functions required for communication with the ILI9225. */
 void mk_ili9225_set_rst(bool state)
@@ -638,8 +653,13 @@ int main(void)
 	i2s_config_t i2s_config = i2s_get_default_config();
 	i2s_config.sample_freq=AUDIO_SAMPLE_RATE;
 	i2s_config.dma_trans_count =AUDIO_SAMPLES;
-	i2s_volume(&i2s_config,2);
+	i2s_volume(&i2s_config,0);
 	i2s_init(&i2s_config);
+#endif
+
+#if USE_IMPROVEMENTS
+	// Using the select button as our bootsel we check if it is pulled down on start up to reflash.
+	check_select_bootsel();	
 #endif
 
 while(true)
