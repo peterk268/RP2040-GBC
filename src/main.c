@@ -149,10 +149,9 @@ static uint8_t pixels_buffer[LCD_WIDTH];
 #if USE_IMPROVEMENTS
 void check_select_bootsel() {
     // If the Select button is pressed during power-on, we should go into bootloader mode.
-    if !gpio_get(GPIO_SELECT) {
-        let gpio_activity_pin_mask = 0;
-        let disable_interface_mask = 0;
-        rp2040_hal::rom_data::reset_to_usb_boot(gpio_activity_pin_mask, disable_interface_mask);
+    if (!gpio_get(GPIO_SELECT)) {
+		// Parameters: gpio_activity_pin_mask, disable_interface_mask
+		reset_usb_boot(0, 0);
     }
 }
 #endif
