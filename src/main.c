@@ -93,6 +93,10 @@
  * This is intended to be played at AUDIO_SAMPLE_RATE Hz
  */
 uint16_t *stream;
+
+i2s_config_t i2s_config;
+// store currently playing file.
+char wav_file[256] = "";
 #endif
 
 /** Definition of ROM data
@@ -153,6 +157,58 @@ void check_select_bootsel() {
 		// Parameters: gpio_activity_pin_mask, disable_interface_mask
 		reset_usb_boot(0, 0);
     }
+}
+
+#define WAV_BUFFER_SIZE 1024
+
+void play_wav(const char *filename, i2s_config_t *i2s_config) {
+	// Mounting SD card
+    sd_card_t *pSD = sd_get_by_num(0);
+    FRESULT fr = f_mount(&pSD->fatfs, pSD->pcName, 1);
+    if (FR_OK != fr) {
+        printf("E f_mount error: %s (%d)\n", FRESULT_str(fr), fr);
+        return;
+    }
+
+	// Adding .wav to end of filename
+    // Ensure the buffer is large enough to hold the concatenated string
+    char full_filename[256]; // Adjust the size as needed
+    strncpy(full_filename, filename, sizeof(full_filename) - 5);  // Leave space for ".wav"
+    full_filename[sizeof(full_filename) - 5] = '\0';  // Null-terminate to ensure a valid string
+    strcat(full_filename, ".wav");
+
+	// opening file
+    FIL fil;
+    fr = f_open(&fil, full_filename, FA_READ);
+
+    if (FR_OK != fr) {
+        // Handle file opening error
+        return;
+    }
+
+	UINT bytes_read = 0;
+	while(1) {
+		int16_t samples[WAV_BUFFER_SIZE];
+		// Skip WAV file header (assuming a simple header here, adjust as needed)
+		f_lseek(&fil, 44);  // 44 bytes is a common size for WAV headers
+
+		// Reading buffer of samples then writing it to i2s.
+		fr = f_read(&fil, samples, WAV_BUFFER_SIZE, &bytes_read);
+		i2s_dma_write(i2s_config, samples);
+
+		if (FR_OK != fr || bytes_read == 0) {
+			// End of file or read error
+			break;
+		}
+	}
+
+	// clean up 
+    fr = f_close(&fil);
+    f_unmount(pSD->pcName);
+}
+
+void play_wav_default(void) {
+	play_wav(wav_file, &i2s_config);
 }
 #endif
 
@@ -508,6 +564,14 @@ void rom_file_selector() {
 	/* get user's input */
 	bool up,down,left,right,a,b,select,start;
 	while(true) {
+#if USE_IMPROVEMENTS
+		// if the wav_file("") string is not equal to the selected filename we start playing the wav file.
+		if (strcmp(wav_file, filename[selected]) != 0) {
+			strcpy(wav_file, filename[selected]);
+			multicore_launch_core1(play_wav_default);
+		}
+#endif
+
 		up=gpio_get(GPIO_UP);
 		down=gpio_get(GPIO_DOWN);
 		left=gpio_get(GPIO_LEFT);
@@ -569,6 +633,8 @@ void rom_file_selector() {
 		}
 		tight_loop_contents();
 	}
+	// Reset wav_file back to empty.
+	strcpy(wav_file, "");
 }
 
 #endif
@@ -649,7 +715,7 @@ int main(void)
     memset(stream,0,AUDIO_BUFFER_SIZE_BYTES);  // Zero out the stream buffer
 	
 	// Initialize I2S sound driver
-	i2s_config_t i2s_config = i2s_get_default_config();
+	i2s_config = i2s_get_default_config();
 	i2s_config.sample_freq=AUDIO_SAMPLE_RATE;
 	i2s_config.dma_trans_count =AUDIO_SAMPLES;
 	i2s_volume(&i2s_config,0);
