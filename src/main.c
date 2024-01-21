@@ -100,11 +100,11 @@ char wav_file[256] = "";
 #endif
 
 /** Definition of ROM data
- * We're going to erase and reprogram a region 2Mb from the start of the flash
+ * We're going to erase and reprogram a region 2Mb from the end of the flash
  * Once done, we can access this at XIP_BASE + 2Mb.
- * Game Boy DMG ROM size ranges from 32768 bytes (e.g. Tetris) to 2,097,152 bytes (e.g. Pokemod Silver)
+ * Game Boy DMG ROM size ranges from 32768 bytes (e.g. Tetris) to 2,097,152 bytes (e.g. Pokemon Silver)
  */
-#define FLASH_TARGET_OFFSET (2 * 1024 * 1024)
+#define FLASH_TARGET_OFFSET (PICO_FLASH_SIZE_BYTES - (1 * 1024 * 1024))
 const uint8_t *rom = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET);
 static unsigned char rom_bank0[65536];
 
@@ -170,35 +170,50 @@ void play_wav(const char *filename, i2s_config_t *i2s_config) {
         return;
     }
 
-	// Adding .wav to end of filename
-    // Ensure the buffer is large enough to hold the concatenated string
-    char full_filename[256]; // Adjust the size as needed
-    strncpy(full_filename, filename, sizeof(full_filename) - 5);  // Leave space for ".wav"
-    full_filename[sizeof(full_filename) - 5] = '\0';  // Null-terminate to ensure a valid string
-    strcat(full_filename, ".wav");
+    fr=f_mount(&pSD->fatfs,pSD->pcName,1);
+    if (FR_OK!=fr) {
+        printf("E f_mount error: %s (%d)\n",FRESULT_str(fr),fr);
+    }
+
+
+	// // Adding .wav to end of filename after removing .gb
+	// // Ensure the buffer is large enough to hold the concatenated string
+	char full_filename[256]; // Adjust the size as needed
+
+	// // Find the position of ".gb" at the end of the filename
+	// size_t gb_position = strlen(filename) - 3; // Length of ".gb"
+
+	// // Check if the filename ends with ".gb"
+	// if (gb_position >= 3 && strcmp(filename + gb_position, ".gb") == 0) {
+	// 	// Remove ".gb" by truncating the string
+	// 	strncpy(full_filename, filename, gb_position);
+	// 	full_filename[gb_position] = '\0';
+	// } else {
+	// 	// If ".gb" is not found, copy the entire filename
+	// 	strncpy(full_filename, filename, sizeof(full_filename));
+	// }
+
+	// // Add ".wav" to the end
+	// strcat(full_filename, ".wav");
 
 	// opening file
     FIL fil;
-    fr = f_open(&fil, full_filename, FA_READ);
-
-    if (FR_OK != fr) {
-        // Handle file opening error
-        return;
-    }
+    fr = f_open(&fil, filename, FA_READ);
 
 	UINT bytes_read = 0;
+	// Skip WAV file header (assuming a simple header here, adjust as needed)
+	f_lseek(&fil, 44);  // 44 bytes is a common size for WAV headers
 	while(1) {
 		int16_t samples[WAV_BUFFER_SIZE];
-		// Skip WAV file header (assuming a simple header here, adjust as needed)
-		f_lseek(&fil, 44);  // 44 bytes is a common size for WAV headers
 
 		// Reading buffer of samples then writing it to i2s.
 		fr = f_read(&fil, samples, WAV_BUFFER_SIZE, &bytes_read);
-		i2s_dma_write(i2s_config, samples);
+		i2s_write(i2s_config, samples, bytes_read / sizeof(int16_t));
 
 		if (FR_OK != fr || bytes_read == 0) {
-			// End of file or read error
 			break;
+			// End of file or read error
+			// play_wav("Pokemon Yellow.wav", i2s_config);
 		}
 	}
 
@@ -208,7 +223,7 @@ void play_wav(const char *filename, i2s_config_t *i2s_config) {
 }
 
 void play_wav_default(void) {
-	play_wav(wav_file, &i2s_config);
+	play_wav("Pokemon Silver.wav", &i2s_config);
 }
 #endif
 
@@ -301,7 +316,12 @@ void core1_lcd_draw_line(const uint_fast8_t line)
 				[pixels_buffer[x] & 3];
 	}
 
+	// // Calculate the start line for the rotated display
+    // uint_fast8_t rotated_line = LCD_HEIGHT - line - 1;
+
+	// mk_ili9225_set_x(rotated_line + 16);
 	mk_ili9225_set_x(line + 16);
+
 	mk_ili9225_write_pixels(fb, LCD_WIDTH);
 	__atomic_store_n(&lcd_line_busy, 0, __ATOMIC_SEQ_CST);
 }
@@ -351,20 +371,29 @@ void main_core1(void)
 void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
 		   const uint_fast8_t line)
 {
-	union core_cmd cmd;
+    union core_cmd cmd;
 
 	/* Wait until previous line is sent. */
 	while(__atomic_load_n(&lcd_line_busy, __ATOMIC_SEQ_CST))
 		tight_loop_contents();
 
-	memcpy(pixels_buffer, pixels, LCD_WIDTH);
-	
-	/* Populate command. */
-	cmd.cmd = CORE_CMD_LCD_LINE;
-	cmd.data = line;
+    // // Reverse the order of pixel data
+    // uint8_t reversed_pixels[LCD_WIDTH];
+    // for (unsigned int i = 0; i < LCD_WIDTH; ++i)
+    // {
+    //     reversed_pixels[i] = pixels[LCD_WIDTH - 1 - i];
+    // }
 
-	__atomic_store_n(&lcd_line_busy, 1, __ATOMIC_SEQ_CST);
-	multicore_fifo_push_blocking(cmd.full);
+	// memcpy(pixels_buffer, reversed_pixels, LCD_WIDTH);
+
+	memcpy(pixels_buffer, pixels, LCD_WIDTH);
+
+    /* Populate command. */
+    cmd.cmd = CORE_CMD_LCD_LINE;
+    cmd.data = line;
+
+    __atomic_store_n(&lcd_line_busy, 1, __ATOMIC_SEQ_CST);
+    multicore_fifo_push_blocking(cmd.full);
 }
 #endif
 
@@ -516,12 +545,14 @@ uint16_t rom_file_selector_display_page(char filename[22][256],uint16_t num_page
 
     /* search *.gb files */
 	uint16_t num_file=0;
-	fr=f_findfirst(&dj, &fno, "", "*.gb");
+	fr=f_findfirst(&dj, &fno, "", "*.gb*");
 
 	/* skip the first N pages */
 	if(num_page>0) {
 		while(num_file<num_page*22 && fr == FR_OK && fno.fname[0]) {
-			num_file++;
+			if (fno.fname[0] != '.') {
+				num_file++;
+			}
 			fr=f_findnext(&dj, &fno);
 		}
 	}
@@ -529,9 +560,11 @@ uint16_t rom_file_selector_display_page(char filename[22][256],uint16_t num_page
 	/* store the filenames of this page */
 	num_file=0;
     while(num_file<22 && fr == FR_OK && fno.fname[0]) {
-		strcpy(filename[num_file],fno.fname);
-        num_file++;
-        fr=f_findnext(&dj, &fno);
+		if (fno.fname[0] != '.') {
+			strcpy(filename[num_file],fno.fname);
+			num_file++;
+		}
+		fr=f_findnext(&dj, &fno);
     }
 	f_closedir(&dj);
 	f_unmount(pSD->pcName);
@@ -565,11 +598,11 @@ void rom_file_selector() {
 	bool up,down,left,right,a,b,select,start;
 	while(true) {
 #if USE_IMPROVEMENTS
-		// if the wav_file("") string is not equal to the selected filename we start playing the wav file.
-		if (strcmp(wav_file, filename[selected]) != 0) {
-			strcpy(wav_file, filename[selected]);
-			multicore_launch_core1(play_wav_default);
-		}
+		// // if the wav_file("") string is not equal to the selected filename we start playing the wav file.
+		// if (strcmp(wav_file, filename[selected]) != 0) {
+		// 	strcpy(wav_file, filename[selected]);
+		// 	multicore_launch_core1(play_wav_default);
+		// }
 #endif
 
 		up=gpio_get(GPIO_UP);
@@ -734,6 +767,7 @@ while(true)
 	/* ROM File selector */
 	mk_ili9225_init();
 	mk_ili9225_fill(0x0000);
+	// multicore_launch_core1(play_wav_default);
 	rom_file_selector();
 #endif
 #endif
@@ -853,6 +887,12 @@ while(true)
 				/* select + A: enable/disable frame-skip => fast-forward */
 				gb.direct.frame_skip=!gb.direct.frame_skip;
 				printf("I gb.direct.frame_skip = %d\n",gb.direct.frame_skip);
+			}
+			if (!gb.direct.joypad_bits.b && prev_joypad_bits.b) {
+				/* select + B: Save game ram*/
+#if ENABLE_SDCARD				
+				write_cart_ram_file(&gb);
+#endif				
 			}
 		}
 
