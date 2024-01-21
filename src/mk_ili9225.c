@@ -16,6 +16,7 @@
 #include <assert.h>
 #include "mk_ili9225.h"
 
+#define orientation 0x1018
 /* Register Descriptions. */
 /**
  * The index register (IR) stored the register address.
@@ -392,7 +393,7 @@ unsigned mk_ili9225_init(void)
 			{ MK_ILI9225_REG_LCD_AC_DRIVING_CTRL,	0x0100 },
 			/* Increment vertical and horizontal address.
 			 * Use vertical image. */
-			{ MK_ILI9225_REG_ENTRY_MODE,		0x1018 },
+			{ MK_ILI9225_REG_ENTRY_MODE,		orientation },
 			/* Turn off all display outputs. */
 			{ MK_ILI9225_REG_DISPLAY_CTRL,		0x0000 },
 			/* Set porches to 8 lines. */
@@ -561,7 +562,7 @@ void mk_ili9225_exit(void)
 
 void mk_ili9225_fill_rect(uint8_t x,uint8_t y,uint8_t w,uint8_t h,uint16_t color)
 {
-	set_register(MK_ILI9225_REG_ENTRY_MODE,0x1018);
+	set_register(MK_ILI9225_REG_ENTRY_MODE,orientation);
 	set_register(MK_ILI9225_REG_HORI_WIN_ADDR1, y+h-1);			// y_max
 	set_register(MK_ILI9225_REG_HORI_WIN_ADDR2, y);				// y_min
 	set_register(MK_ILI9225_REG_VERT_WIN_ADDR1, 219-x);			// x_max
@@ -590,7 +591,7 @@ void mk_ili9225_pixel(uint8_t x,uint8_t y,uint16_t color)
 }
 
 void mk_ili9225_blit(uint16_t *fbuf,uint8_t x,uint8_t y,uint8_t w,uint8_t h) {
-	set_register(MK_ILI9225_REG_ENTRY_MODE,0x1018);
+	set_register(MK_ILI9225_REG_ENTRY_MODE,orientation);
 	set_register(MK_ILI9225_REG_HORI_WIN_ADDR1, y+h-1);			// y_max
 	set_register(MK_ILI9225_REG_HORI_WIN_ADDR2, y);				// y_min
 	set_register(MK_ILI9225_REG_VERT_WIN_ADDR1, 219-x);			// x_max
