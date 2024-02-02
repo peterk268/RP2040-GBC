@@ -104,7 +104,7 @@ char wav_file[256] = "";
  * Once done, we can access this at XIP_BASE + 2Mb.
  * Game Boy DMG ROM size ranges from 32768 bytes (e.g. Tetris) to 2,097,152 bytes (e.g. Pokemon Silver)
  */
-#define FLASH_TARGET_OFFSET (PICO_FLASH_SIZE_BYTES - (1 * 1024 * 1024))
+#define FLASH_TARGET_OFFSET (4 * 1024 * 1024)
 const uint8_t *rom = (const uint8_t *) (XIP_BASE + FLASH_TARGET_OFFSET);
 static unsigned char rom_bank0[65536];
 
@@ -317,10 +317,10 @@ void core1_lcd_draw_line(const uint_fast8_t line)
 	}
 
 	// // Calculate the start line for the rotated display
-    // uint_fast8_t rotated_line = LCD_HEIGHT - line - 1;
+    uint_fast8_t rotated_line = LCD_HEIGHT - line - 1;
 
-	// mk_ili9225_set_x(rotated_line + 16);
-	mk_ili9225_set_x(line + 16);
+	mk_ili9225_set_x(rotated_line + 16);
+	// mk_ili9225_set_x(line + 16);
 
 	mk_ili9225_write_pixels(fb, LCD_WIDTH);
 	__atomic_store_n(&lcd_line_busy, 0, __ATOMIC_SEQ_CST);
@@ -377,16 +377,16 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
 	while(__atomic_load_n(&lcd_line_busy, __ATOMIC_SEQ_CST))
 		tight_loop_contents();
 
-    // // Reverse the order of pixel data
-    // uint8_t reversed_pixels[LCD_WIDTH];
-    // for (unsigned int i = 0; i < LCD_WIDTH; ++i)
-    // {
-    //     reversed_pixels[i] = pixels[LCD_WIDTH - 1 - i];
-    // }
+    // Reverse the order of pixel data
+    uint8_t reversed_pixels[LCD_WIDTH];
+    for (unsigned int i = 0; i < LCD_WIDTH; ++i)
+    {
+        reversed_pixels[i] = pixels[LCD_WIDTH - 1 - i];
+    }
 
-	// memcpy(pixels_buffer, reversed_pixels, LCD_WIDTH);
+	memcpy(pixels_buffer, reversed_pixels, LCD_WIDTH);
 
-	memcpy(pixels_buffer, pixels, LCD_WIDTH);
+	// memcpy(pixels_buffer, pixels, LCD_WIDTH);
 
     /* Populate command. */
     cmd.cmd = CORE_CMD_LCD_LINE;
