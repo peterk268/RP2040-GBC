@@ -146,6 +146,7 @@ union core_cmd {
 
 /* Pixel data is stored in here. */
 static uint8_t pixels_buffer[LCD_WIDTH];
+static struct gb_s *gbc;
 
 #define putstdio(x) write(1, x, strlen(x))
 
@@ -310,11 +311,21 @@ void core1_lcd_draw_line(const uint_fast8_t line)
 {
 	static uint16_t fb[LCD_WIDTH];
 
-	for(unsigned int x = 0; x < LCD_WIDTH; x++)
-	{
-		fb[x] = palette[(pixels_buffer[x] & LCD_PALETTE_ALL) >> 4]
-				[pixels_buffer[x] & 3];
+#if PEANUT_FULL_GBC_SUPPORT
+ 	if (gbc->cgb.cgbMode) {
+ 		for(unsigned int x = 0; x < LCD_WIDTH; x++){
+			fb[x] = gbc->cgb.fixPalette[pixels_buffer[x]];
+		}
+ 	}
+ 	else {
+#endif
+ 		for(unsigned int x = 0; x < LCD_WIDTH; x++){
+			fb[x] = palette[(pixels_buffer[x] & LCD_PALETTE_ALL) >> 4]
+					[pixels_buffer[x] & 3];
+		}
+#if PEANUT_FULL_GBC_SUPPORT
 	}
+#endif	
 
 	// // Calculate the start line for the rotated display
     uint_fast8_t rotated_line = LCD_HEIGHT - line - 1;
@@ -386,6 +397,7 @@ void lcd_draw_line(struct gb_s *gb, const uint8_t pixels[LCD_WIDTH],
 
 	memcpy(pixels_buffer, reversed_pixels, LCD_WIDTH);
 
+	gbc = gb;
 	// memcpy(pixels_buffer, pixels, LCD_WIDTH);
 
     /* Populate command. */
