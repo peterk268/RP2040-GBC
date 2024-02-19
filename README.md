@@ -1,5 +1,5 @@
 # RP2040-GBC
-### Edits by me to use gbc emulator, with additions such as led pwm, larger flash support, select as bootselect, and rotated display
+### Edits by me to support gbc, with additions such as led pwm, larger flash support, select as bootselect, and rotated display
 
 # Forked from:
 
