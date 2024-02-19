@@ -1,4 +1,9 @@
-# RP2040-GB for Pico-GB
+# RP2040-GBC
+### Edits by me to use gbc emulator, with additions such as led pwm, larger flash support, select as bootselect, and rotated display
+
+# Forked from:
+
+# [RP2040-GB for Pico-GB](https://github.com/YouMakeTech/Pico-GB)  
 
 This is a fork of the [RP2040-GB Game Boy (DMG) emulator from deltabeard](https://github.com/deltabeard/RP2040-GB). RP2040-GB is a Game Boy (DMG) emulator Peanut-GB on the Raspberry Pi RP2040 microcontroller, using an ILI9225 screen. Runs at more than 70 fps without audio emulation. With frame skip and interlacing, can run at up to 120 fps.
 
