@@ -58,6 +58,7 @@
 #include <pico/multicore.h>
 #include <sys/unistd.h>
 #include <hardware/irq.h>
+#include "hardware/pwm.h"
 
 /* Project headers */
 #include "hedley.h"
@@ -720,7 +721,7 @@ int main(void)
 	gpio_set_function(GPIO_SDA, GPIO_FUNC_SPI);
 	gpio_set_function(GPIO_RS, GPIO_FUNC_SIO);
 	gpio_set_function(GPIO_RST, GPIO_FUNC_SIO);
-	gpio_set_function(GPIO_LED, GPIO_FUNC_SIO);
+	gpio_set_function(GPIO_LED, GPIO_FUNC_PWM);
 
 	gpio_set_dir(GPIO_UP, false);
 	gpio_set_dir(GPIO_DOWN, false);
@@ -733,7 +734,13 @@ int main(void)
 	gpio_set_dir(GPIO_CS, true);
 	gpio_set_dir(GPIO_RS, true);
 	gpio_set_dir(GPIO_RST, true);
-	gpio_set_dir(GPIO_LED, true);
+
+	uint slice_num = pwm_gpio_to_slice_num(GPIO_LED);
+	uint8_t led_pwm_duty_cycle = 64; // set to 6/8 brightness level, 0 highest, 255 lowest
+	pwm_set_wrap(slice_num, 255); // Set PWM period
+    pwm_set_chan_level(slice_num, PWM_CHAN_A, led_pwm_duty_cycle); // Set PWM duty cycle
+	pwm_set_enabled(slice_num, true); // Enable PWM
+
 	gpio_set_slew_rate(GPIO_CLK, GPIO_SLEW_RATE_FAST);
 	gpio_set_slew_rate(GPIO_SDA, GPIO_SLEW_RATE_FAST);
 	
@@ -867,11 +874,23 @@ while(true)
 #if ENABLE_SOUND
 			if(!gb.direct.joypad_bits.up && prev_joypad_bits.up) {
 				/* select + up: increase sound volume */
-				i2s_increase_volume(&i2s_config);
+				// i2s_increase_volume(&i2s_config);
+				if (led_pwm_duty_cycle >= 32) { // Ensure it won't go below 0
+					led_pwm_duty_cycle -= 32;
+				} else {
+					led_pwm_duty_cycle = 0; // Clamp to 0 if it would go below 0
+				}
+				pwm_set_chan_level(slice_num, PWM_CHAN_A, led_pwm_duty_cycle);
 			}
 			if(!gb.direct.joypad_bits.down && prev_joypad_bits.down) {
 				/* select + down: decrease sound volume */
-				i2s_decrease_volume(&i2s_config);
+				// i2s_decrease_volume(&i2s_config);
+				if (led_pwm_duty_cycle <= (255 - 32)) { // Ensure it won't exceed 255
+					led_pwm_duty_cycle += 32;
+				} else {
+					led_pwm_duty_cycle = 255; // Clamp to 255 if it would exceed
+				}
+				pwm_set_chan_level(slice_num, PWM_CHAN_A, led_pwm_duty_cycle);
 			}
 #endif
 			if(!gb.direct.joypad_bits.right && prev_joypad_bits.right) {

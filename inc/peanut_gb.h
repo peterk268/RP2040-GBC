@@ -121,9 +121,10 @@
 #define CONTROL_INTR	0x10
 #define ANY_INTR	0x1F
 
+#warning Change WRAM back to 0x8000 when we get a better MCU
 /* Memory section sizes for DMG */
 #if PEANUT_FULL_GBC_SUPPORT
-#define WRAM_SIZE	0x6000
+#define WRAM_SIZE	0x7000
 #define VRAM_SIZE	0x4000
 #else
 #define WRAM_SIZE	0x2000
